@@ -1,13 +1,11 @@
-# netease-mail-draft-assistant
+# NetEase Mail Draft Assistant
 
-NetEase Mail Draft Assistant v3.8.0 - 网易邮箱外联工作台 Chrome 扩展 (MV3)
+Chrome MV3 workbench for preparing NetEase 163 mail drafts.
 
-面向网易邮箱的批量外联工作台。文件、草稿箱和历史已发送/回复邮件统一先导入为外联任务，再进入自动识别、异常核验、排期与执行；历史邮件任务在最终执行时自动使用网易原生 Fw/Re，并保留回复识别、原邮件上下文与附件完整性核验。
+## Runtime model
 
-核心原则：能自动判断的不要求用户确认；只有异常和真正需要决策的项目进入人工处理。
+Files, mailbox drafts, and historical mail enter one task pipeline: import → inspect → plan → create draft. Native NetEase Forward/Reply remains an execution mode for tasks imported from historical mail.
 
-## 安装
+Business rules are policy data, not engine defaults. When a scheduling, identity, or follow-up rule has not been explicitly configured or supplied by source data, the core keeps it unset rather than inventing a value.
 
-1. 下载本仓库代码
-2. 打开 Chrome，进入 `chrome://extensions`
-3. 开启「开发者模式」，点击「加载已解压的扩展程序」，选择本目录
+See `POLICY_BOUNDARIES.md` for the runtime boundary between capability, evidence, policy, and migration.

@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "NetEase Mail Draft Assistant",
-  "version": "3.8.0",
-  "description": "网易邮箱外联工作台：文件、草稿箱与历史邮件统一导入为外联任务；自动核验与排期，执行时保留网易原生 Fw/Re、回复识别与附件完整性。",
+  "version": "3.9.0",
+  "description": "网易邮箱外联工作台：统一导入、核验、排期与草稿执行；业务规则由来源事实和显式配置决定。",
   "permissions": [
     "storage",
     "scripting",
