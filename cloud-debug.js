@@ -32,6 +32,16 @@ async function refreshMeta() {
   return getState();
 }
 
+async function closeBrowserResources() {
+  const activeBrowser = browser;
+  browser = null;
+  context = null;
+  page = null;
+  if (activeBrowser) {
+    try { await activeBrowser.close(); } catch (_) {}
+  }
+}
+
 async function ensureBrowser() {
   if (page && !page.isClosed()) return page;
 
@@ -292,12 +302,7 @@ async function screenshot() {
 }
 
 async function reset() {
-  if (browser) {
-    try { await browser.close(); } catch (_) {}
-  }
-  browser = null;
-  context = null;
-  page = null;
+  await closeBrowserResources();
   touch({
     phase: 'idle', url: '', title: '', lastAction: 'browser reset', lastError: '',
     browserReady: false, verificationRequired: false
@@ -306,9 +311,7 @@ async function reset() {
 }
 
 async function close() {
-  if (browser) {
-    try { await browser.close(); } catch (_) {}
-  }
+  await closeBrowserResources();
 }
 
 function captureError(error) {
