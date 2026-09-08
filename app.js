@@ -94,7 +94,7 @@
     root.innerHTML = `
       <section id="nmda-panel" aria-label="网易邮箱外联工作台">
         <header class="nmda-topbar">
-          <div class="nmda-brand"><span class="nmda-brand-mark">N</span><div><strong>网易邮箱外联工作台</strong><small>导入 → 核验 → 排期 → 创建草稿</small></div></div>
+          <div class="nmda-brand"><div><strong>网易邮箱外联工作台</strong><small>导入 → 核验 → 排期 → 创建草稿</small></div></div>
           <div class="nmda-top-actions">
             <div id="nmda-connection" class="nmda-connection" data-state="checking"><span></span><div><strong>检查邮箱连接</strong><small>网易邮箱</small></div></div>
             <button id="nmda-open-mail" class="nmda-btn" type="button">连接邮箱</button>
@@ -436,7 +436,7 @@
       const key=input.dataset.taskSelect; input.checked ? state.selected.add(key) : state.selected.delete(key);
       syncSelectionState();
     }));
-    list.querySelectorAll('[data-task-open]').forEach(button=>button.addEventListener('click',()=>openEditor(button.dataset.taskOpen)));
+    list.querySelectorAll('[data-task-open]').forEach(button=>button.addEventListener('click',event=>{if(event.target.closest?.('.nmda-recipient-cell'))return;openEditor(button.dataset.taskOpen);}));
     $('nmda-attachment-summary').textContent = `${state.attachmentFiles.length} 个文件${state.tasks.some(t=>t.issues.some(x=>x.startsWith('缺少附件')))?' · 仍有未匹配':''}`;
   }
 
