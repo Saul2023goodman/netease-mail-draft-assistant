@@ -1,0 +1,46 @@
+name: v4-cleanup
+
+on:
+  push:
+    branches:
+      - refactor/v4-task-lifecycle
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    if: ${{ !contains(github.event.head_commit.message, '[v4-cleanup]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refactor/v4-task-lifecycle
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Apply source cleanup
+        run: node scripts/apply-v4-cleanup.mjs
+      - name: Syntax check
+        run: |
+          node --check app.js
+          node --check workflow-unifier.js
+          node --check scheduler.js
+          node --check roster-v2.js
+          node --check default-policy.js
+          node --check policy-profile.js
+          node --check policy-bridge.js
+      - name: Tests
+        run: npm test
+      - name: Commit generated cleanup
+        run: |
+          if git diff --quiet; then
+            echo "No generated cleanup changes"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app.js workflow-unifier.js
+          git commit -m "refactor: remove legacy follow-up and policy fallbacks [v4-cleanup]"
+          git push origin HEAD:refactor/v4-task-lifecycle
