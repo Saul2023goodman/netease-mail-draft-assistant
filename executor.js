@@ -4,13 +4,7 @@
   if (window.top !== window) return;
 
   const APP = 'NetEase Mail Draft Assistant';
-  const STORAGE_KEY = 'nmda.form.v2';
   const DEFAULT_TIMEOUT = 10000;
-  const Importer = globalThis.NMDAImporter;
-  const MailRecognizer = globalThis.NMDAMailRecognizer;
-  const Contacts = globalThis.NMDAContacts;
-  const Scheduler = globalThis.NMDAScheduler;
-  const Roster = globalThis.NMDARoster;
   const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
   function visible(el) {
@@ -647,7 +641,7 @@
     const map = new Map();
     for (const file of files || []) {
       if (!file) continue;
-      const key = Importer?.fileIdentity?.(file) || `${file.name}|${file.size}|${file.lastModified}`;
+      const key = `${file.name}|${file.size}|${file.lastModified}`;
       if (!map.has(key)) map.set(key, file);
     }
     return [...map.values()];
@@ -1110,13 +1104,6 @@
         sendResponse({ ok: false, reason: error?.message || String(error) });
       });
       return true;
-    }
-    if (message?.type === 'NMDA_LEGACY_PREFS') {
-      try {
-        sendResponse({ ok: true, scheduleRules: localStorage.getItem('nmda.schedule.rules.v1') || '' });
-      } catch (error) {
-        sendResponse({ ok: false, reason: error?.message || String(error) });
-      }
     }
   });
 

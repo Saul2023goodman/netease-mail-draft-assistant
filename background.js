@@ -785,10 +785,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
     if (message?.type === 'NMDA_NATIVE_FOLLOWUP_START') return nativeFollowUpStart(tabId, message);
     if (message?.type === 'NMDA_NATIVE_MESSAGE_OPEN') return nativeReadRoute(tabId, { id:message.sourceMessageId || message.id || '' });
-    if (message?.type === 'NMDA_LEGACY_PREFS') {
-      await waitForExecutor(tabId);
-      return chrome.tabs.sendMessage(tabId, {type:'NMDA_LEGACY_PREFS'});
-    }
     if (message?.type === 'NMDA_OPEN_COMPOSE') {
       return runMain(tabId, () => {
         try {
