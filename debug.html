@@ -45,6 +45,9 @@
 </div>
 <script>
 const $=id=>document.getElementById(id);let shotUrl='';
+const DEBUG_TOKEN_KEY='nmda.railway.debug.token';
+try{$('token').value=localStorage.getItem(DEBUG_TOKEN_KEY)||''}catch(_){}
+$('token').addEventListener('input',()=>{try{localStorage.setItem(DEBUG_TOKEN_KEY,$('token').value)}catch(_){}});
 function headers(){return {'Content-Type':'application/json','X-Debug-Token':$('token').value.trim()}}
 async function api(path,method='GET',body){const r=await fetch(path,{method,headers:headers(),body:body?JSON.stringify(body):undefined});if(!r.ok)throw new Error((await r.text())||('HTTP '+r.status));return r.json()}
 function paint(s){$('phaseBadge').textContent=s.phase||'unknown';$('sPhase').textContent=s.phase||'—';$('sTitle').textContent=s.title||'—';$('sUrl').textContent=s.url||'—';$('sAction').textContent=s.lastAction||'—';$('sVerify').textContent=s.verificationRequired?'需要人工验证':'否';$('sError').textContent=s.lastError||'—';$('sError').className=s.lastError?'err':'';$('sTime').textContent=s.updatedAt||'—'}
