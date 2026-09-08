@@ -6,6 +6,8 @@ Chrome MV3 workbench for preparing NetEase 163 mail drafts.
 
 Files, mailbox drafts, and historical mail enter one task pipeline: import → inspect → plan → create draft. Native NetEase Forward/Reply remains an execution mode for tasks imported from historical mail.
 
-Business rules are policy data, not engine defaults. When a scheduling, identity, or follow-up rule has not been explicitly configured or supplied by source data, the core keeps it unset rather than inventing a value.
+Automation defaults are allowed, but they are isolated from core business logic. `default-policy.js` is the single source for product-level defaults; `policy-profile.js` adds user overrides and learned identity relationships; engines only execute the resolved policy.
 
-See `POLICY_BOUNDARIES.md` for the runtime boundary between capability, evidence, policy, and migration.
+No named institution alias, past batch, preferred weekday/time example, or historical workaround belongs in core code. Institution relationships are learned from evidence or explicit confirmation instead of being shipped as special cases.
+
+See `POLICY_BOUNDARIES.md` for the boundary between capability, defaults, user policy, evidence, and migration.
