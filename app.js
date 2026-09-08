@@ -86,7 +86,7 @@
       phase,
       verificationRequired: source?.verificationRequired === true || phase === 'verification_required',
       needsToken,
-      error: String(source?.lastError || '')
+      error: String(source?.lastError || (source?.error ? '云端登录失败，请打开调试台查看' : ''))
     };
   }
 
@@ -1003,6 +1003,11 @@
   window.addEventListener('focus',refreshMailboxConnection);
   document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshMailboxConnection();});
   refreshMailboxConnection();
+  if (standaloneMode) {
+    window.setInterval(() => {
+      if (!document.hidden) void refreshMailboxConnection();
+    }, 3000);
+  }
 
   const contactBook = { account: '', contacts: {}, loaded: false };
 
