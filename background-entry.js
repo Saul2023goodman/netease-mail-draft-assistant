@@ -44,10 +44,13 @@ function findImportedFollowUp(message, registry) {
     .filter(entry => entry?.status === 'pending' && firstEmail(entry.email) === email)
     .sort((a, b) => (Date.parse(b.createdAt || '') || 0) - (Date.parse(a.createdAt || '') || 0));
   if (!pending.length) return null;
+  const body = String(task.body || '');
+  const marked = pending.filter(entry => entry.reviewMarker && body.includes(String(entry.reviewMarker)));
+  const pool = marked.length ? marked : pending;
   const subject = cleanSubject(task.subject);
-  const exact = pending.filter(entry => cleanSubject(entry.expectedSubject) === subject);
+  const exact = pool.filter(entry => cleanSubject(entry.expectedSubject) === subject);
   if (exact.length) return exact[0];
-  return pending.length === 1 ? pending[0] : null;
+  return pool.length === 1 ? pool[0] : null;
 }
 
 function introFromTask(task, entry) {
@@ -100,7 +103,9 @@ chrome.tabs.sendMessage = async function routedTabSendMessage(tabId, message, ..
   const task = message.task || {};
   let result;
   if (entry.mode === 'new') {
-    result = await nativeTabSendMessage(tabId, message, ...rest);
+    const marker = String(entry.reviewMarker || '');
+    const cleanBody = marker ? String(task.body || '').replace(marker, '\n\n---------- Original message ----------\n') : String(task.body || '');
+    result = await nativeTabSendMessage(tabId, { ...message, task:{ ...task, body:cleanBody } }, ...rest);
   } else {
     const routed = {
       ...message,
