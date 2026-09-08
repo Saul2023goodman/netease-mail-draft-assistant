@@ -3,11 +3,9 @@
 
   const PROFILE_KEY = 'nmda.policy.profile.v1';
   const LEGACY_SCHEDULE_KEY = 'nmda.schedule.rules.v1';
-  const DEFAULT_POLICY = globalThis.NMDADefaultPolicy || {
-    version:1,
-    schedule:{startStrategy:'next-hour',leadMinutes:60,grouping:'institution',maxPerGroupPerRound:1,intervalDays:7,preserveExisting:true,intraRoundMinutes:10,skipHolidays:true,allowDomainFallback:false},
-    identity:{aliases:[],persistInferredAliases:false}
-  };
+  const DEFAULT_POLICY = globalThis.NMDADefaultPolicy;
+  if (!DEFAULT_POLICY) throw new Error('NMDADefaultPolicy must be loaded before policy-profile.js');
+
   const SCHEDULE_FIELDS = new Set([
     'grouping','maxPerGroupPerRound','intervalDays','preserveExisting',
     'skipHolidays','intraRoundMinutes','allowDomainFallback'
@@ -129,8 +127,7 @@
 
   function sanitizeScheduleInput(input = {}) {
     if (input?.policySource === 'explicit' || input?.__explicit === true) return { ...input };
-    const defaults = effectiveSchedule();
-    const resolved = { ...defaults };
+    const resolved = effectiveSchedule();
     for (const field of SCHEDULE_FIELDS) {
       if (explicit.has(field) && Object.prototype.hasOwnProperty.call(input, field)) {
         resolved[field] = normalizeComparable(field, input[field]);
