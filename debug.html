@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>NetEase Cloud Debug</title>
+  <style>
+    :root{font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#172033;background:#f5f7fb}*{box-sizing:border-box}body{margin:0}.shell{max-width:1500px;margin:0 auto;padding:22px}.top{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:16px}.top h1{font-size:22px;margin:0}.top p{margin:5px 0 0;color:#667085}.badge{padding:7px 10px;border-radius:999px;background:#fff;border:1px solid #dfe4ec;font-size:13px}.grid{display:grid;grid-template-columns:360px minmax(0,1fr);gap:16px}.card{background:#fff;border:1px solid #e1e6ef;border-radius:16px;box-shadow:0 8px 28px rgba(20,31,55,.05);padding:16px}.stack{display:grid;gap:12px}.row{display:flex;gap:8px;flex-wrap:wrap}label{font-size:12px;font-weight:700;color:#475467;display:block;margin-bottom:6px}input,button{font:inherit}input{width:100%;border:1px solid #ccd4e0;border-radius:10px;padding:10px 12px;background:#fff}button{border:1px solid #ccd4e0;background:#fff;border-radius:10px;padding:9px 12px;cursor:pointer}button.primary{background:#111827;color:#fff;border-color:#111827}button.danger{color:#b42318}.status{display:grid;grid-template-columns:100px 1fr;gap:8px 10px;font-size:13px}.status b{color:#667085}.status span{word-break:break-all}.screen{min-height:620px;display:flex;align-items:center;justify-content:center;background:#111827;border-radius:12px;overflow:auto}.screen img{display:block;max-width:100%;height:auto}.hint{font-size:12px;color:#667085;line-height:1.6}.ok{color:#067647}.warn{color:#b54708}.err{color:#b42318}@media(max-width:900px){.grid{grid-template-columns:1fr}.screen{min-height:420px}}
+  </style>
+</head>
+<body>
+<div class="shell">
+  <div class="top"><div><h1>网易邮箱 · Railway Playwright 调试台</h1><p>供 Work / Cloud Browser 检查真实网页状态、截图和基础交互。</p></div><div class="badge" id="phaseBadge">未连接</div></div>
+  <div class="grid">
+    <aside class="stack">
+      <section class="card stack">
+        <div><label>Debug Access Token</label><input id="token" type="password" autocomplete="off" placeholder="输入 Railway 调试 Token"></div>
+        <div class="row"><button class="primary" id="login">自动登录网易邮箱</button><button id="refresh">刷新状态 / 截图</button><button class="danger" id="reset">重置浏览器</button></div>
+        <div class="hint">测试邮箱凭据保存在 Railway Secret 中，不会显示在此页面，也不会写入 GitHub。</div>
+      </section>
+      <section class="card stack">
+        <div><label>导航到 URL</label><input id="url" value="https://mail.163.com/"></div>
+        <button id="navigate">打开</button>
+        <div class="row"><button data-key="Tab">Tab</button><button data-key="Enter">Enter</button><button data-key="Escape">Esc</button></div>
+        <div><label>键盘输入（发送到当前焦点）</label><input id="typing" placeholder="输入调试文字"></div>
+        <button id="type">输入</button>
+        <div class="hint">截图支持直接点击：点击右侧截图会把对应坐标发送给云端 Chromium。可用于普通按钮、标签页和验证码前的人工排障。</div>
+      </section>
+      <section class="card">
+        <div class="status">
+          <b>阶段</b><span id="sPhase">—</span>
+          <b>页面</b><span id="sTitle">—</span>
+          <b>URL</b><span id="sUrl">—</span>
+          <b>最近动作</b><span id="sAction">—</span>
+          <b>验证</b><span id="sVerify">—</span>
+          <b>错误</b><span id="sError">—</span>
+          <b>更新时间</b><span id="sTime">—</span>
+        </div>
+      </section>
+    </aside>
+    <main class="card">
+      <div class="screen" id="screen"><span style="color:#98a2b3">输入 Token 后点击“刷新状态 / 截图”</span></div>
+    </main>
+  </div>
+</div>
+<script>
+const $=id=>document.getElementById(id);let shotUrl='';
+function headers(){return {'Content-Type':'application/json','X-Debug-Token':$('token').value.trim()}}
+async function api(path,method='GET',body){const r=await fetch(path,{method,headers:headers(),body:body?JSON.stringify(body):undefined});if(!r.ok)throw new Error((await r.text())||('HTTP '+r.status));return r.json()}
+function paint(s){$('phaseBadge').textContent=s.phase||'unknown';$('sPhase').textContent=s.phase||'—';$('sTitle').textContent=s.title||'—';$('sUrl').textContent=s.url||'—';$('sAction').textContent=s.lastAction||'—';$('sVerify').textContent=s.verificationRequired?'需要人工验证':'否';$('sError').textContent=s.lastError||'—';$('sError').className=s.lastError?'err':'';$('sTime').textContent=s.updatedAt||'—'}
+async function refresh(){const s=await api('/debug/api/status');paint(s);const r=await fetch('/debug/api/screenshot',{headers:headers()});if(!r.ok)throw new Error(await r.text());const b=await r.blob();if(shotUrl)URL.revokeObjectURL(shotUrl);shotUrl=URL.createObjectURL(b);const img=new Image();img.src=shotUrl;img.id='shot';img.alt='Playwright browser screenshot';$('screen').replaceChildren(img);img.onclick=async e=>{const rect=img.getBoundingClientRect();const x=(e.clientX-rect.left)*(img.naturalWidth/rect.width);const y=(e.clientY-rect.top)*(img.naturalHeight/rect.height);paint(await api('/debug/api/click','POST',{x,y}));setTimeout(refresh,350)}}
+async function run(fn){try{await fn()}catch(e){alert(e.message)}}
+$('refresh').onclick=()=>run(refresh);
+$('login').onclick=()=>run(async()=>{paint(await api('/debug/api/login','POST',{}));await refresh()});
+$('reset').onclick=()=>run(async()=>{paint(await api('/debug/api/reset','POST',{}));$('screen').textContent='浏览器已重置';});
+$('navigate').onclick=()=>run(async()=>{paint(await api('/debug/api/navigate','POST',{url:$('url').value}));await refresh()});
+$('type').onclick=()=>run(async()=>{paint(await api('/debug/api/type','POST',{text:$('typing').value}));await refresh()});
+document.querySelectorAll('[data-key]').forEach(b=>b.onclick=()=>run(async()=>{paint(await api('/debug/api/key','POST',{key:b.dataset.key}));await refresh()}));
+</script>
+</body>
+</html>
