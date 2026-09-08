@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "NetEase Mail Draft Assistant",
-  "version": "3.7.0",
-  "description": "网易邮箱外联工作台：批量草稿、排期、联系人历史与人工 Follow-up；读取并区分真人回复/Auto Reply，支持网易原生 Fw/Re 与完整性核验。",
+  "version": "3.8.0",
+  "description": "网易邮箱外联工作台：文件、草稿箱与历史邮件统一导入为外联任务；自动核验与排期，执行时保留网易原生 Fw/Re、回复识别与附件完整性。",
   "permissions": [
     "storage",
     "scripting",
@@ -15,7 +15,7 @@
     "default_title": "打开网易邮箱外联工作台"
   },
   "background": {
-    "service_worker": "background.js"
+    "service_worker": "background-entry.js"
   },
   "content_scripts": [
     {
