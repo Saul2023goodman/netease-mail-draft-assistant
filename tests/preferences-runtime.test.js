@@ -20,21 +20,22 @@ function runtime(seed = {}) {
   };
   context.globalThis = context;
   vm.createContext(context);
-  for (const file of ['default-policy.js', 'policy-profile.js', 'scheduler.js', 'roster-v2.js']) {
+  for (const file of ['runtime-defaults.js', 'preferences-store.js', 'scheduler.js', 'roster-v2.js']) {
     vm.runInContext(fs.readFileSync(path.join(ROOT, file), 'utf8'), context, { filename:file });
   }
   return context;
 }
 
-test('core scheduler stays policy-neutral while product profile supplies automation defaults', () => {
-  const { NMDAScheduler: Scheduler, NMDAPolicyProfile: Policy } = runtime();
+test('runtime defaults support the scheduler without becoming scheduler core', () => {
+  const { NMDAScheduler: Scheduler, NMDAPreferences: Preferences, NMDARuntimeDefaults: Defaults } = runtime();
   assert.equal(Scheduler.DEFAULT_RULES.startAt, '');
   assert.equal(Scheduler.DEFAULT_RULES.grouping, 'none');
   assert.equal(Scheduler.DEFAULT_RULES.maxPerGroupPerRound, null);
   assert.equal(Scheduler.DEFAULT_RULES.intervalDays, null);
   assert.equal(Scheduler.DEFAULT_RULES.skipHolidays, false);
 
-  const effective = Policy.getEffectivePolicy().schedule;
+  assert.equal(Defaults.historySource.mode, 'forward');
+  const effective = Preferences.getEffectivePreferences().schedule;
   assert.equal(effective.grouping, 'institution');
   assert.equal(effective.maxPerGroupPerRound, 1);
   assert.equal(effective.intervalDays, 7);
@@ -48,22 +49,29 @@ test('core scheduler stays policy-neutral while product profile supplies automat
   assert.ok(resolved.startAt);
 });
 
-test('legacy values equal to product defaults are not promoted to user overrides', () => {
+test('4.0 compatibility aliases resolve to the new runtime APIs', () => {
+  const runtimeContext = runtime();
+  assert.equal(runtimeContext.NMDADefaultPolicy.schedule, runtimeContext.NMDARuntimeDefaults.schedule);
+  assert.equal(runtimeContext.NMDAPolicyProfile, runtimeContext.NMDAPreferences);
+  assert.equal(runtimeContext.NMDADefaultPolicy.followUp, runtimeContext.NMDARuntimeDefaults.historySource);
+});
+
+test('legacy values equal to defaults are not promoted to user overrides', () => {
   const legacy = JSON.stringify({maxPerGroupPerRound:1,intervalDays:7,preserveExisting:true,intraRoundMinutes:10,skipHolidays:true});
-  const { NMDAPolicyProfile: Policy } = runtime({'nmda.schedule.rules.v1': legacy});
-  assert.equal(Array.from(Policy.getProfile().schedule.explicitFields).length, 0);
+  const { NMDAPreferences: Preferences } = runtime({'nmda.schedule.rules.v1': legacy});
+  assert.equal(Array.from(Preferences.getPreferences().schedule.explicitFields).length, 0);
 });
 
 test('legacy values that differ from defaults become user overrides', () => {
   const legacy = JSON.stringify({maxPerGroupPerRound:2,intervalDays:14,preserveExisting:true,intraRoundMinutes:10,skipHolidays:false});
-  const { NMDAPolicyProfile: Policy } = runtime({'nmda.schedule.rules.v1': legacy});
-  const effective = Policy.getEffectivePolicy().schedule;
+  const { NMDAPreferences: Preferences } = runtime({'nmda.schedule.rules.v1': legacy});
+  const effective = Preferences.getEffectivePreferences().schedule;
   assert.equal(effective.maxPerGroupPerRound, 2);
   assert.equal(effective.intervalDays, 14);
   assert.equal(effective.skipHolidays, false);
 });
 
-test('explicit scheduling input is honored without adding hidden rules', () => {
+test('explicit scheduling input is honored without hidden rules', () => {
   const { NMDAScheduler: Scheduler } = runtime();
   const rules = Scheduler.normalizeRules({
     policySource:'explicit',
@@ -89,9 +97,9 @@ test('invalid local dates are rejected instead of rolling forward', () => {
   assert.ok(Scheduler.parseLocalDateTime('2032-02-29T09:00'));
 });
 
-test('default policy ships no institution-specific aliases', () => {
-  const { NMDAPolicyProfile: Policy } = runtime();
-  assert.equal(Array.from(Policy.getDefaultPolicy().identity.aliases).length, 0);
+test('runtime defaults ship no institution-specific aliases', () => {
+  const { NMDAPreferences: Preferences } = runtime();
+  assert.equal(Array.from(Preferences.getDefaults().identity.aliases).length, 0);
 });
 
 test('institution similarity does not create identity by itself', () => {
@@ -101,8 +109,8 @@ test('institution similarity does not create identity by itself', () => {
 });
 
 test('learned alias may unify labels without changing core code', () => {
-  const { NMDAPolicyProfile: Policy, NMDARoster: Roster } = runtime();
-  Policy.setInstitutionAlias('Example University', ['Example University London']);
+  const { NMDAPreferences: Preferences, NMDARoster: Roster } = runtime();
+  Preferences.setInstitutionAlias('Example University', ['Example University London']);
   assert.equal(Roster.sameSchool('Example University', 'Example University London'), true);
 });
 

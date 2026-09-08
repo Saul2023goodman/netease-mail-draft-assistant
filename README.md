@@ -1,19 +1,39 @@
 # NetEase Mail Draft Assistant
 
-Chrome MV3 workbench for preparing NetEase 163 mail drafts.
+Chrome MV3 outreach task workbench for NetEase 163 Mail.
 
-## Runtime model
+## Product model
 
-All outreach enters one task workbench. A single message and a large batch use the same task pipeline: source import → automatic recognition → exception review when needed → scheduling → draft execution.
+The product has one primary workflow:
 
-Files, folders, pasted content, mailbox drafts, rosters, attachments, and eligible historical mail are sources. The importer determines their role. A roster is evidence for identity, duplicate checks, and scheduling; it is not a separate workflow. Sources that can be classified safely continue automatically, while only ambiguous sources interrupt the user.
+**source intake → automatic recognition → exception review → scheduling → draft execution**
 
-Contacts are an evidence store rather than a top-level workbench. Sent, draft, and reply state comes from mailbox facts. The user-facing contact control is policy: allow contact, pause, or permanently stop. Contact facts and recent history are opened contextually from a recipient in the task list.
+A single email and a large batch use the same task model. Files, folders, pasted content, rosters, attachments and eligible historical messages are all sources that feed the same pipeline.
 
-Historical follow-up is pending work, not a separate module. Only messages that currently satisfy the follow-up policy appear in Pending; importing one creates an ordinary task whose execution mode can preserve native NetEase Forward/Reply behavior.
+The interface should optimize the primary task flow first. Supporting capabilities stay contextual:
 
-Automation defaults are allowed, but they are isolated from core business logic. `default-policy.js` is the single source for product-level defaults; `policy-profile.js` adds user overrides and learned identity relationships; engines only execute the resolved policy.
+- roster data helps recognition, ordering and grouping;
+- recipient history provides mailbox evidence and duplicate / reply context;
+- historical sent mail can be added as a supplementary source;
+- native NetEase Fw / Re is an execution mode for tasks created from historical mail;
+- pause / stop controls are recipient-level safeguards, not a CRM workflow.
 
-No named institution alias, past batch, preferred weekday/time example, or historical workaround belongs in core code. Institution relationships are learned from evidence or explicit confirmation instead of being shipped as special cases.
+Scheduling defaults, user preferences, learned aliases and legacy migration are internal execution support. They must not become top-level product navigation or dominate user-facing copy.
 
-See `POLICY_BOUNDARIES.md` for the boundary between capability, defaults, user policy, evidence, and migration.
+## Runtime structure
+
+- `import-core.js`, `import-adapters.js`, `importer.js` — source intake and classification
+- `mail-recognizer.js` — mail field recognition
+- `app.js` — primary task workbench
+- `scheduler.js` — scheduling capability and validation
+- `executor.js` — NetEase draft / native execution
+- `contacts.js` — mailbox-derived recipient evidence
+- `roster-v2.js` — roster evidence
+- `history-source.js` — supplementary historical-mail source
+- `runtime-defaults.js` — product defaults
+- `preferences-store.js` — user overrides and learned aliases
+- `schedule-preferences.js` — scheduling preference presentation
+
+Legacy storage keys and global aliases are retained where needed so upgrading from 4.0 does not discard existing settings or pending history-source execution records.
+
+See `ARCHITECTURE.md` for product priority and module-boundary rules.

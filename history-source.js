@@ -2,20 +2,21 @@
   'use strict';
 
   const Contacts = globalThis.NMDAContacts;
-  const DefaultPolicy = globalThis.NMDADefaultPolicy;
+  const Defaults = globalThis.NMDARuntimeDefaults || globalThis.NMDADefaultPolicy;
+
+  // Storage keys stay unchanged so existing installations keep their history-source
+  // settings and pending native Fw/Re execution records after the 4.1 refactor.
   const SETTINGS_KEY = 'nmda.followup.settings.v1';
   const REGISTRY_KEY = 'nmda.followup.import.registry.v1';
+
   const state = {
     account: '',
     contacts: {},
     settings: null,
     selected: new Set(),
-    search: '',
-    filter: 'eligible',
     loading: false
   };
 
-  const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
   const $ = selector => document.querySelector(selector);
 
   function escapeHtml(value) {
@@ -27,7 +28,7 @@
   }
 
   async function send(message) {
-    if (!globalThis.chrome?.runtime?.sendMessage) throw new Error('历史邮件导入仅在 Chrome 扩展中可用。');
+    if (!globalThis.chrome?.runtime?.sendMessage) throw new Error('历史邮件来源仅在 Chrome 扩展中可用。');
     return chrome.runtime.sendMessage(message);
   }
 
@@ -42,8 +43,7 @@
   }
 
   function defaultSettings() {
-    const policy = DefaultPolicy?.followUp || {};
-    return { ...policy };
+    return { ...(Defaults?.historySource || Defaults?.followUp || {}) };
   }
 
   function normalizeSettings(value = {}) {
@@ -58,7 +58,7 @@
       blockAutoReply: value.blockAutoReply == null ? !!base.blockAutoReply : value.blockAutoReply === true,
       fwPrefix: String(value.fwPrefix ?? base.fwPrefix ?? '').trim(),
       rePrefix: String(value.rePrefix ?? base.rePrefix ?? '').trim(),
-      template: String(value.template ?? base.template)
+      template: String(value.template ?? base.template ?? '')
     };
   }
 
@@ -116,18 +116,21 @@
     contact = Contacts?.normalizeContactShape?.(contact || {}) || contact || {};
     const source = sourceFor(contact);
     if (!source) return { eligible:false, source:null, reasons:['没有已发送原邮件'], days:0, human:[], auto:[] };
+
     const sourceMs = Date.parse(source.sentAt || '') || 0;
     const days = sourceMs ? Math.max(0, Math.floor((Date.now() - sourceMs) / 86400000)) : 0;
     const replies = repliesAfter(contact, source.sentAt);
     const human = replies.filter(item => !item.autoReply);
     const auto = replies.filter(item => item.autoReply);
     const reasons = [];
+
     if (contact.policy === '暂停') reasons.push('联系人已暂停');
     if (contact.policy === '不再联系') reasons.push('联系人已设为不再联系');
     if (days < settings.minDays) reasons.push(`仅等待 ${days} 天`);
     if (settings.blockHumanReply && human.length) reasons.push('已有真人回复');
     if (settings.blockAutoReply && auto.length) reasons.push('已有 Auto Reply');
     if (settings.maxCount > 0 && Number(contact.followUpCount || 0) >= settings.maxCount) reasons.push(`已达到 ${settings.maxCount} 次上限`);
+
     return { eligible:reasons.length === 0, source, reasons, days, human, auto };
   }
 
@@ -154,26 +157,27 @@
     return state.contacts;
   }
 
-  async function syncThroughExistingMailboxReader() {
+  async function syncMailboxEvidence() {
     const connection = await send({ type:'NMDA_CONNECTION_STATUS' });
     if (!connection?.connected || !connection?.authenticated) throw new Error('请先连接并登录网易邮箱。');
+
     state.account = await detectAccount();
     state.contacts = Contacts ? await Contacts.load(state.account) : {};
     const result = await send({ type:'NMDA_READ_MAILBOX_STATE', mode:'quick' });
-    if(!result?.ok)throw new Error(result?.reason || '邮箱读取失败');
-    const next=Contacts.cloneContacts(state.contacts);
-    Contacts.applySentMessages(next,result.sent?.messages||[]);
-    Contacts.applyDraftMessages(next,result.drafts?.messages||[],{replaceActive:result.drafts?.complete===true});
-    Contacts.applyInboxMessages(next,result.inbox?.messages||[]);
-    await Contacts.save(state.account,next);
-    state.contacts=next;
+    if (!result?.ok) throw new Error(result?.reason || '邮箱读取失败');
+
+    const next = Contacts.cloneContacts(state.contacts);
+    Contacts.applySentMessages(next, result.sent?.messages || []);
+    Contacts.applyDraftMessages(next, result.drafts?.messages || [], { replaceActive:result.drafts?.complete === true });
+    Contacts.applyInboxMessages(next, result.inbox?.messages || []);
+    await Contacts.save(state.account, next);
+    state.contacts = next;
     return next;
   }
 
   async function loadRegistry() {
     const stored = (await storageGet(REGISTRY_KEY))[REGISTRY_KEY];
-    const entries = Array.isArray(stored?.entries) ? stored.entries : [];
-    return { version:1, entries };
+    return { version:1, entries:Array.isArray(stored?.entries) ? stored.entries : [] };
   }
 
   async function appendRegistry(entries) {
@@ -223,44 +227,40 @@
     const body = $('#nmda-history-body');
     const summary = $('#nmda-history-summary');
     if (!body || !summary) return;
+
     const query = String($('#nmda-history-search')?.value || '').trim().toLowerCase();
-    const filter = 'eligible';
-    state.search = query;
-    state.filter = filter;
     const registry = await loadRegistry();
     const pending = pendingRegistryByEmail(registry);
     const rows = [];
+
     for (const raw of Object.values(state.contacts || {})) {
       const contact = Contacts.normalizeContactShape(raw);
       if (!Number(contact.sentCount || 0)) continue;
       const check = eligibility(contact);
+      if (!check.eligible) continue;
       const haystack = `${contact.email} ${contact.name || ''} ${check.source?.subject || ''}`.toLowerCase();
       if (query && !haystack.includes(query)) continue;
-      if (filter === 'eligible' && !check.eligible) continue;
-      if (filter === 'human' && !check.human.length) continue;
-      if (filter === 'auto' && !check.auto.length) continue;
-      if (filter === 'pending' && !(pending.get(contact.email)?.length)) continue;
       rows.push({ contact, check, alreadyPending:pending.get(contact.email)?.length || 0 });
     }
-    rows.sort((a,b) => {
-      if (a.check.eligible !== b.check.eligible) return a.check.eligible ? -1 : 1;
-      return (Date.parse(a.check.source?.sentAt || '') || 0) - (Date.parse(b.check.source?.sentAt || '') || 0);
-    });
+
+    rows.sort((a,b) => (Date.parse(a.check.source?.sentAt || '') || 0) - (Date.parse(b.check.source?.sentAt || '') || 0));
     const eligibleCount = Object.values(state.contacts || {}).filter(raw => Number(raw?.sentCount || 0) && eligibility(raw).eligible).length;
-    summary.textContent = `${eligibleCount} 个可导入 · 当前显示 ${rows.length}`;
+    summary.textContent = `${eligibleCount} 个可加入 · 当前显示 ${rows.length}`;
+
     body.innerHTML = rows.length ? rows.map(({contact,check,alreadyPending}) => {
-      const disabled = !check.eligible || alreadyPending > 0;
+      const disabled = alreadyPending > 0;
       const reply = check.human.length ? '真人回复' : check.auto.length ? 'Auto Reply' : '无回复';
-      const stateText = alreadyPending ? '已在当前任务中' : check.eligible ? `已等待 ${check.days} 天` : check.reasons.join('；');
+      const stateText = alreadyPending ? '已在当前任务中' : `已等待 ${check.days} 天`;
       return `<tr data-email="${escapeHtml(contact.email)}">
         <td><input type="checkbox" data-history-select="${escapeHtml(contact.email)}" ${state.selected.has(contact.email) ? 'checked' : ''} ${disabled ? 'disabled' : ''}></td>
         <td class="nmda-history-contact"><strong>${escapeHtml(contact.name || contact.email)}</strong><small>${escapeHtml(contact.name ? contact.email : '')}</small></td>
         <td class="nmda-history-source"><strong title="${escapeHtml(check.source?.subject || '')}">${escapeHtml(check.source?.subject || '(无主题)')}</strong><small>${escapeHtml(Contacts.formatDisplayTime(check.source?.sentAt || ''))}</small></td>
         <td><span class="nmda-history-reply" data-kind="${check.human.length ? 'human' : check.auto.length ? 'auto' : 'none'}">${escapeHtml(reply)}</span></td>
-        <td class="nmda-history-state" data-ok="${check.eligible && !alreadyPending ? '1' : '0'}">${escapeHtml(stateText)}</td>
+        <td class="nmda-history-state" data-ok="${alreadyPending ? '0' : '1'}">${escapeHtml(stateText)}</td>
       </tr>`;
-    }).join('') : '<tr><td colspan="5" class="nmda-history-empty">没有匹配的历史邮件。</td></tr>';
-    const validVisible = rows.filter(row => row.check.eligible && !row.alreadyPending).map(row => row.contact.email);
+    }).join('') : '<tr><td colspan="5" class="nmda-history-empty">当前没有需要加入的历史邮件。</td></tr>';
+
+    const validVisible = rows.filter(row => !row.alreadyPending).map(row => row.contact.email);
     state.selected = new Set([...state.selected].filter(email => validVisible.includes(email)));
     updateSelectedCount();
   }
@@ -268,7 +268,7 @@
   function updateSelectedCount() {
     const el = $('#nmda-history-selected');
     const button = $('#nmda-history-import-selected');
-    if (el) el.textContent = `已选 ${state.selected.size} 封`;
+    if (el) el.textContent = `已选 ${state.selected.size} 项`;
     if (button) button.disabled = !state.selected.size || state.loading;
   }
 
@@ -282,26 +282,29 @@
     overlay.innerHTML = `
       <section class="nmda-workflow-dialog nmda-history-dialog" role="dialog" aria-modal="true" aria-labelledby="nmda-history-title">
         <header class="nmda-workflow-dialog-head">
-          <div><span class="nmda-dialog-eyebrow">导入来源</span><h3 id="nmda-history-title">处理待跟进邮件</h3><p>这里只显示当前规则判断为需要处理的历史邮件；导入后与普通任务走同一套核验、排期与执行流程。</p></div>
+          <div><span class="nmda-dialog-eyebrow">补充来源</span><h3 id="nmda-history-title">从历史邮件创建任务</h3><p>选择历史邮件后，它们会作为普通任务加入当前批次；核验、排期和执行仍走同一条主流程。</p></div>
           <button class="nmda-dialog-close" id="nmda-history-close" type="button" aria-label="关闭">×</button>
         </header>
         <div class="nmda-history-body-wrap">
           <div class="nmda-history-toolbar">
             <label class="nmda-history-search"><span>⌕</span><input id="nmda-history-search" type="search" placeholder="搜索联系人或原主题"></label>
-            <button class="nmda-btn nmda-btn-small" id="nmda-history-sync" type="button">同步邮箱</button>
+            <button class="nmda-btn nmda-btn-small" id="nmda-history-sync" type="button">同步邮箱记录</button>
           </div>
-          <div class="nmda-history-rulebar">
-            <label><span>形式</span><select id="nmda-history-mode"><option value="forward">Fw / 原生转发</option><option value="reply">Re / 原生回复</option><option value="new">新邮件</option></select></label>
-            <label><span>最少等待</span><input id="nmda-history-min-days" type="number" min="0" max="365" step="1"><b>天</b></label>
-            <label><span>最多次数</span><input id="nmda-history-max-count" type="number" min="0" max="20" step="1"></label>
-            <label class="nmda-history-check"><input id="nmda-history-block-human" type="checkbox"><span>真人回复后停止</span></label>
-            <label class="nmda-history-check"><input id="nmda-history-block-auto" type="checkbox"><span>Auto Reply 也停止</span></label>
-            <details class="nmda-history-template"><summary>正文模板</summary><textarea id="nmda-history-template" rows="6"></textarea><small>变量：{{name}} · {{email}} · {{subject}} · {{days}}</small></details>
-          </div>
-          <div class="nmda-history-list-head"><div><strong>历史邮件</strong><small id="nmda-history-status">读取已同步的联系人记录。</small></div><span id="nmda-history-summary">0 个可导入</span></div>
+          <details class="nmda-history-advanced">
+            <summary><span><strong>高级规则</strong><small>仅在需要改变历史邮件处理方式时调整</small></span><b>展开</b></summary>
+            <div class="nmda-history-rulebar">
+              <label><span>执行方式</span><select id="nmda-history-mode"><option value="forward">Fw / 原生转发</option><option value="reply">Re / 原生回复</option><option value="new">新邮件</option></select></label>
+              <label><span>最少等待</span><input id="nmda-history-min-days" type="number" min="0" max="365" step="1"><b>天</b></label>
+              <label><span>最多次数</span><input id="nmda-history-max-count" type="number" min="0" max="20" step="1"></label>
+              <label class="nmda-history-check"><input id="nmda-history-block-human" type="checkbox"><span>真人回复后不再加入</span></label>
+              <label class="nmda-history-check"><input id="nmda-history-block-auto" type="checkbox"><span>Auto Reply 也阻止加入</span></label>
+              <details class="nmda-history-template"><summary>正文模板</summary><textarea id="nmda-history-template" rows="6"></textarea><small>变量：{{name}} · {{email}} · {{subject}} · {{days}}</small></details>
+            </div>
+          </details>
+          <div class="nmda-history-list-head"><div><strong>可加入的历史邮件</strong><small id="nmda-history-status">读取已同步的邮箱记录。</small></div><span id="nmda-history-summary">0 个可加入</span></div>
           <div class="nmda-table-wrap nmda-history-table-wrap"><table class="nmda-table nmda-history-table"><thead><tr><th></th><th>联系人</th><th>原邮件</th><th>回复</th><th>状态</th></tr></thead><tbody id="nmda-history-body"></tbody></table></div>
         </div>
-        <footer class="nmda-workflow-dialog-foot nmda-history-foot"><span id="nmda-history-selected">已选 0 封</span><div class="nmda-dialog-foot-spacer"></div><button class="nmda-btn nmda-btn-small nmda-btn-quiet" id="nmda-history-cancel" type="button">取消</button><button class="nmda-btn nmda-btn-primary nmda-btn-small" id="nmda-history-import-selected" type="button" disabled>导入所选</button></footer>
+        <footer class="nmda-workflow-dialog-foot nmda-history-foot"><span id="nmda-history-selected">已选 0 项</span><div class="nmda-dialog-foot-spacer"></div><button class="nmda-btn nmda-btn-small nmda-btn-quiet" id="nmda-history-cancel" type="button">取消</button><button class="nmda-btn nmda-btn-primary nmda-btn-small" id="nmda-history-import-selected" type="button" disabled>加入当前任务</button></footer>
       </section>`;
     panel.appendChild(overlay);
 
@@ -317,28 +320,38 @@
       if (input.checked) state.selected.add(email); else state.selected.delete(email);
       updateSelectedCount();
     });
+
     ['nmda-history-mode','nmda-history-min-days','nmda-history-max-count','nmda-history-block-human','nmda-history-block-auto'].forEach(id => {
-      $(`#${id}`)?.addEventListener('change', async () => { await saveSettings(); state.selected.clear(); await renderCandidates(); });
+      $(`#${id}`)?.addEventListener('change', async () => {
+        await saveSettings();
+        state.selected.clear();
+        await renderCandidates();
+      });
     });
+
     let templateTimer = 0;
     $('#nmda-history-template')?.addEventListener('input', () => {
       clearTimeout(templateTimer);
       templateTimer = setTimeout(() => saveSettings().catch(()=>{}), 250);
     });
+
     $('#nmda-history-sync')?.addEventListener('click', async event => {
       const button = event.currentTarget;
       button.disabled = true;
       setStatus('正在同步已发送、草稿与回复记录…');
       try {
-        await syncThroughExistingMailboxReader();
+        await syncMailboxEvidence();
         setStatus('邮箱记录已同步。', 'ok');
         state.selected.clear();
         await renderCandidates();
       } catch (error) {
         setStatus(`同步失败：${error.message}`, 'error');
-      } finally { button.disabled = false; }
+      } finally {
+        button.disabled = false;
+      }
     });
-    $('#nmda-history-import-selected')?.addEventListener('click', () => importSelected().catch(error => setStatus(`导入失败：${error.message}`, 'error')));
+
+    $('#nmda-history-import-selected')?.addEventListener('click', () => importSelected().catch(error => setStatus(`加入失败：${error.message}`, 'error')));
   }
 
   async function openModal() {
@@ -346,13 +359,13 @@
     const modal = $('#nmda-history-import-modal');
     if (!modal) return;
     modal.hidden = false;
-    setStatus('正在读取已同步的联系人记录…');
+    setStatus('正在读取已同步的邮箱记录…');
     try {
       await Promise.all([loadSettings(), loadContacts()]);
       syncSettingControls();
       state.selected.clear();
       await renderCandidates();
-      setStatus('选择需要处理的原邮件，然后加入当前任务。', 'ok');
+      setStatus('选择需要加入当前批次的原邮件。', 'ok');
     } catch (error) {
       setStatus(error.message, 'error');
     }
@@ -374,9 +387,11 @@
   async function buildImportedTask(email) {
     const contact = Contacts.normalizeContactShape(state.contacts[email] || {});
     const check = eligibility(contact);
-    if (!check.eligible || !check.source) throw new Error(`${email} 当前不符合导入规则。`);
+    if (!check.eligible || !check.source) throw new Error(`${email} 当前不符合历史邮件加入条件。`);
+
     const detail = await send({ type:'NMDA_READ_MESSAGE_DETAIL', summary:check.source });
     if (!detail?.ok) throw new Error(`${email}：${detail?.reason || '无法读取原邮件详情'}`);
+
     const settings = state.settings || defaultSettings();
     const introText = renderTemplate(settings.template, contact, check.source, check.days).trim();
     const modeLabel = settings.mode === 'forward' ? 'Fw 转发' : settings.mode === 'reply' ? 'Re 回复' : '新邮件';
@@ -388,15 +403,16 @@
       `To: ${detail.to || contact.email || ''}`
     ].join('\n');
     const reviewBody = `${introText}${reviewMarker}${sourceHeader}\n\n${detail.body || ''}`.trim();
-    const id = `fuimp:${Date.now()}:${Math.random().toString(36).slice(2,9)}`;
+    const id = `history:${Date.now()}:${Math.random().toString(36).slice(2,9)}`;
     const subject = expectedSubject(check.source, settings);
+
     return {
       task: {
         id,
         recipients: contact.email,
         subject,
         body: reviewBody,
-        tags: '历史邮件导入'
+        tags: '历史邮件来源'
       },
       registry: {
         id,
@@ -430,88 +446,84 @@
     if (!state.selected.size || state.loading) return;
     state.loading = true;
     updateSelectedCount();
-    await saveSettings();
-    const emails = [...state.selected];
-    setStatus(`正在读取 ${emails.length} 封原邮件详情…`);
-    const results = await mapPool(emails, 3, async email => {
-      try { return { ok:true, value:await buildImportedTask(email) }; }
-      catch (error) { return { ok:false, email, error }; }
-    });
-    const good = results.filter(item => item.ok).map(item => item.value);
-    const failed = results.filter(item => !item.ok);
-    if (!good.length) {
+
+    try {
+      await saveSettings();
+      const emails = [...state.selected];
+      setStatus(`正在读取 ${emails.length} 封原邮件详情…`);
+
+      const results = await mapPool(emails, 3, async email => {
+        try { return { ok:true, value:await buildImportedTask(email) }; }
+        catch (error) { return { ok:false, email, error }; }
+      });
+      const good = results.filter(item => item.ok).map(item => item.value);
+      const failed = results.filter(item => !item.ok);
+      if (!good.length) throw new Error(failed.map(item => item.error?.message || item.email).join('；') || '没有可加入邮件。');
+
+      await appendRegistry(good.map(item => item.registry));
+      const input = $('#nmda-import-file');
+      if (!input) throw new Error('当前任务导入器尚未就绪。');
+
+      const file = new File([JSON.stringify(good.map(item => item.task), null, 2)], `history-source-${Date.now()}.json`, { type:'application/json' });
+      const transfer = new DataTransfer();
+      transfer.items.add(file);
+      input.files = transfer.files;
+      input.dispatchEvent(new Event('change', { bubbles:true }));
+
+      state.selected.clear();
+      const modal = $('#nmda-history-import-modal');
+      if (modal) modal.hidden = true;
+      await refreshHistoryEntry();
+
+      const note = failed.length ? `；${failed.length} 封读取失败，可重新打开历史邮件重试` : '';
+      const importStatus = $('#nmda-import-status');
+      if (importStatus) {
+        importStatus.textContent = `已把 ${good.length} 封历史邮件加入当前批次${note}。`;
+        importStatus.dataset.kind = failed.length ? 'warn' : 'ok';
+      }
+    } finally {
       state.loading = false;
       updateSelectedCount();
-      throw new Error(failed.map(item => item.error?.message || item.email).join('；') || '没有可导入邮件。');
-    }
-
-    await appendRegistry(good.map(item => item.registry));
-    const input = $('#nmda-import-file');
-    if (!input) throw new Error('当前批次导入器尚未就绪。');
-    const file = new File([JSON.stringify(good.map(item => item.task), null, 2)], `history-task-${Date.now()}.json`, { type:'application/json' });
-    const transfer = new DataTransfer();
-    transfer.items.add(file);
-    input.files = transfer.files;
-    input.dispatchEvent(new Event('change', { bubbles:true }));
-
-    state.selected.clear();
-    state.loading = false;
-    updateSelectedCount();
-    const modal = $('#nmda-history-import-modal');
-    if (modal) modal.hidden = true;
-    await refreshPendingEntry();
-    const note = failed.length ? `；${failed.length} 封读取失败，可重新打开待处理列表重试` : '';
-    const importStatus = $('#nmda-import-status');
-    if (importStatus) {
-      importStatus.textContent = `已把 ${good.length} 封历史邮件加入当前批次${note}。已进入统一任务流程。`;
-      importStatus.dataset.kind = failed.length ? 'warn' : 'ok';
     }
   }
 
-  function eligiblePendingCount() {
+  function eligibleCount() {
     return Object.values(state.contacts || {}).filter(raw => Number(raw?.sentCount || 0) && eligibility(raw).eligible).length;
   }
 
-  async function refreshPendingEntry() {
-    const button=$('#nmda-history-pending');
-    if(!button)return;
-    try{
-      await Promise.all([loadSettings(),loadContacts()]);
-      const count=eligiblePendingCount();
-      button.hidden=count===0;
-      button.textContent=count?`待处理 ${count}`:'待处理';
-    }catch(_){button.hidden=true;}
+  async function refreshHistoryEntry() {
+    const button = $('#nmda-history-source');
+    if (!button) return;
+    try {
+      await Promise.all([loadSettings(), loadContacts()]);
+      const count = eligibleCount();
+      button.hidden = count === 0;
+      button.textContent = count ? `历史邮件 · ${count}` : '历史邮件';
+    } catch (_) {
+      button.hidden = true;
+    }
   }
 
-  function installImportEntry() {
+  function installHistoryEntry() {
     const actions = $('#nmda-import-card .nmda-card-head .nmda-row');
-    if (!actions || $('#nmda-history-pending')) return;
+    if (!actions || $('#nmda-history-source')) return;
+
     const button = document.createElement('button');
-    button.id = 'nmda-history-pending';
+    button.id = 'nmda-history-source';
     button.type = 'button';
-    button.className = 'nmda-btn nmda-btn-small nmda-btn-quiet';
+    button.className = 'nmda-btn nmda-btn-small nmda-btn-quiet nmda-secondary-source';
     button.hidden = true;
-    button.textContent = '待处理';
+    button.textContent = '历史邮件';
     actions.insertBefore(button, actions.firstChild);
-    button.addEventListener('click', () => openModal().catch(error => console.warn('[NMDA] history pending failed', error)));
-    setTimeout(()=>refreshPendingEntry(),500);
-    window.addEventListener('focus',()=>refreshPendingEntry().catch(()=>{}));
-  }
+    button.addEventListener('click', () => openModal().catch(error => console.warn('[NMDA] history source failed', error)));
 
-
-  function relabelProduct() {
-    const batchTab = $('[data-tab="batch"] strong');
-    if (batchTab) batchTab.textContent = '外联任务';
-    const batchTitle = $('[data-page-head="batch"] h2');
-    if (batchTitle) batchTitle.textContent = '外联任务';
-    const batchDesc = $('[data-page-head="batch"] p');
-    if (batchDesc) batchDesc.textContent = '导入 → 自动识别 → 核验异常 → 排期 → 执行';
+    setTimeout(() => refreshHistoryEntry(), 500);
+    window.addEventListener('focus', () => refreshHistoryEntry().catch(()=>{}));
   }
 
   function init() {
     if (!$('#nmda-root')) return;
-    relabelProduct();
-    installImportEntry();
+    installHistoryEntry();
     createModal();
   }
 

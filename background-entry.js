@@ -1,11 +1,12 @@
 'use strict';
 
-// Follow-up is modeled as an import source. The app imports a historical message into
-// the normal task pipeline; this router only switches the final execution back to
-// NetEase's native Fw/Re path so the original message and attachments stay intact.
+// Tasks created from historical mail still enter the normal task pipeline. This router
+// only switches the final execution to NetEase's native Fw/Re path so the original
+// message and attachments remain intact.
 importScripts('contacts.js');
 
-const FOLLOWUP_IMPORT_REGISTRY_KEY = 'nmda.followup.import.registry.v1';
+// Keep the legacy storage key for upgrade compatibility.
+const HISTORY_IMPORT_REGISTRY_KEY = 'nmda.followup.import.registry.v1';
 const nativeTabSendMessage = chrome.tabs.sendMessage.bind(chrome.tabs);
 const Contacts = globalThis.NMDAContacts;
 
@@ -18,7 +19,7 @@ function cleanSubject(value) {
 }
 
 async function loadRegistry() {
-  const stored = (await chrome.storage.local.get(FOLLOWUP_IMPORT_REGISTRY_KEY))[FOLLOWUP_IMPORT_REGISTRY_KEY];
+  const stored = (await chrome.storage.local.get(HISTORY_IMPORT_REGISTRY_KEY))[HISTORY_IMPORT_REGISTRY_KEY];
   const entries = Array.isArray(stored?.entries) ? stored.entries : [];
   const cutoff = Date.now() - 30 * 86400000;
   return {
@@ -33,10 +34,10 @@ async function loadRegistry() {
 }
 
 async function saveRegistry(registry) {
-  await chrome.storage.local.set({ [FOLLOWUP_IMPORT_REGISTRY_KEY]: registry });
+  await chrome.storage.local.set({ [HISTORY_IMPORT_REGISTRY_KEY]: registry });
 }
 
-function findImportedFollowUp(message, registry) {
+function findHistorySourceEntry(message, registry) {
   const task = message?.task || {};
   const email = firstEmail(task.recipients);
   if (!email) return null;
@@ -44,6 +45,7 @@ function findImportedFollowUp(message, registry) {
     .filter(entry => entry?.status === 'pending' && firstEmail(entry.email) === email)
     .sort((a, b) => (Date.parse(b.createdAt || '') || 0) - (Date.parse(a.createdAt || '') || 0));
   if (!pending.length) return null;
+
   const body = String(task.body || '');
   const marked = pending.filter(entry => entry.reviewMarker && body.includes(String(entry.reviewMarker)));
   const pool = marked.length ? marked : pending;
@@ -81,7 +83,7 @@ async function recordCompletion(entry, currentTask, result, registry) {
       sourceSubject: entry.sourceSubject || '',
       subject: entry.executedSubject,
       status: 'draft',
-      note: result?.outcome?.saveOutcome?.evidence || '由历史邮件导入任务创建',
+      note: result?.outcome?.saveOutcome?.evidence || '由历史邮件来源创建任务',
       verification: result?.outcome?.nativeVerification || null
     });
     await Contacts.save(entry.account, contacts);
@@ -97,7 +99,7 @@ chrome.tabs.sendMessage = async function routedTabSendMessage(tabId, message, ..
   try { registry = await loadRegistry(); }
   catch (_) { return nativeTabSendMessage(tabId, message, ...rest); }
 
-  const entry = findImportedFollowUp(message, registry);
+  const entry = findHistorySourceEntry(message, registry);
   if (!entry) return nativeTabSendMessage(tabId, message, ...rest);
 
   const task = message.task || {};
@@ -109,6 +111,8 @@ chrome.tabs.sendMessage = async function routedTabSendMessage(tabId, message, ..
   } else {
     const routed = {
       ...message,
+      // Legacy IPC type retained because executor.js already implements and verifies
+      // NetEase native reply/forward behavior under this message contract.
       type: 'NMDA_EXECUTE_FOLLOWUP',
       task: {
         mode: entry.mode === 'reply' ? 'reply' : 'forward',

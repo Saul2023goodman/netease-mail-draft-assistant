@@ -1,10 +1,11 @@
 (() => {
   'use strict';
 
-  const PROFILE_KEY = 'nmda.policy.profile.v1';
+  // Keep the existing key so upgrades retain user choices from 4.0 and earlier.
+  const PREFERENCES_KEY = 'nmda.policy.profile.v1';
   const LEGACY_SCHEDULE_KEY = 'nmda.schedule.rules.v1';
-  const DEFAULT_POLICY = globalThis.NMDADefaultPolicy;
-  if (!DEFAULT_POLICY) throw new Error('NMDADefaultPolicy must be loaded before policy-profile.js');
+  const DEFAULTS = globalThis.NMDARuntimeDefaults || globalThis.NMDADefaultPolicy;
+  if (!DEFAULTS) throw new Error('NMDARuntimeDefaults must be loaded before preferences-store.js');
 
   const SCHEDULE_FIELDS = new Set([
     'grouping','maxPerGroupPerRound','intervalDays','preserveExisting',
@@ -34,7 +35,7 @@
       .map(item => String(item || '').normalize('NFKC').trim()).filter(Boolean))];
     return { canonical, aliases };
   }
-  function normalizeProfile(value) {
+  function normalizePreferences(value) {
     const schedule = value?.schedule && typeof value.schedule === 'object' ? value.schedule : {};
     const overrides = schedule.overrides && typeof schedule.overrides === 'object' ? schedule.overrides : {};
     const explicitFields = [...new Set((Array.isArray(schedule.explicitFields) ? schedule.explicitFields : [])
@@ -48,8 +49,8 @@
     };
   }
 
-  let profile = normalizeProfile(readJson(PROFILE_KEY));
-  const explicit = new Set(profile.schedule.explicitFields);
+  let preferences = normalizePreferences(readJson(PREFERENCES_KEY));
+  const explicit = new Set(preferences.schedule.explicitFields);
 
   function normalizeComparable(field, value) {
     if (field === 'grouping') return value === 'institution' ? 'institution' : 'none';
@@ -61,52 +62,52 @@
     return value;
   }
 
+  function savePreferences() {
+    preferences.schedule.explicitFields = [...explicit];
+    writeJson(PREFERENCES_KEY, preferences);
+  }
+
   function migrateLegacyOverrides() {
-    if (profile.schedule.explicitFields.length || Object.keys(profile.schedule.overrides).length) return;
+    if (preferences.schedule.explicitFields.length || Object.keys(preferences.schedule.overrides).length) return;
     const legacy = readJson(LEGACY_SCHEDULE_KEY);
     if (!legacy || typeof legacy !== 'object') return;
     for (const field of SCHEDULE_FIELDS) {
       if (!Object.prototype.hasOwnProperty.call(legacy, field)) continue;
       const legacyValue = normalizeComparable(field, legacy[field]);
-      const defaultValue = normalizeComparable(field, DEFAULT_POLICY.schedule?.[field]);
+      const defaultValue = normalizeComparable(field, DEFAULTS.schedule?.[field]);
       if (legacyValue === defaultValue) continue;
       explicit.add(field);
-      profile.schedule.overrides[field] = legacyValue;
+      preferences.schedule.overrides[field] = legacyValue;
     }
-    saveProfile();
-  }
-
-  function saveProfile() {
-    profile.schedule.explicitFields = [...explicit];
-    writeJson(PROFILE_KEY, profile);
+    savePreferences();
   }
 
   function setScheduleOverride(field, value) {
     if (!SCHEDULE_FIELDS.has(field)) return;
     explicit.add(field);
-    profile.schedule.overrides[field] = normalizeComparable(field, value);
-    saveProfile();
+    preferences.schedule.overrides[field] = normalizeComparable(field, value);
+    savePreferences();
   }
 
   function clearScheduleOverride(field) {
     if (!SCHEDULE_FIELDS.has(field)) return;
     explicit.delete(field);
-    delete profile.schedule.overrides[field];
-    saveProfile();
+    delete preferences.schedule.overrides[field];
+    savePreferences();
   }
 
   function isScheduleFieldExplicit(field) { return explicit.has(field); }
 
   function effectiveSchedule() {
     return {
-      ...clone(DEFAULT_POLICY.schedule || {}),
-      ...clone(profile.schedule.overrides || {})
+      ...clone(DEFAULTS.schedule || {}),
+      ...clone(preferences.schedule.overrides || {})
     };
   }
 
   function setGrouping(value, { explicit:mark = true } = {}) {
     if (mark) setScheduleOverride('grouping', value === 'institution' ? 'institution' : 'none');
-    else profile.schedule.overrides.grouping = value === 'institution' ? 'institution' : 'none';
+    else preferences.schedule.overrides.grouping = value === 'institution' ? 'institution' : 'none';
   }
 
   function getGrouping() { return effectiveSchedule().grouping === 'institution' ? 'institution' : 'none'; }
@@ -134,6 +135,7 @@
       }
     }
     resolved.startAt = String(input.startAt || suggestedStart()).trim();
+    // Preserve the legacy marker because scheduler compatibility reads it internally.
     resolved.policySource = 'profile';
     return resolved;
   }
@@ -150,7 +152,7 @@
   function resolveInstitutionKey(value) {
     const rawKey = institutionKey(value);
     if (!rawKey) return '';
-    for (const entry of profile.identity.aliases) {
+    for (const entry of preferences.identity.aliases) {
       const canonicalKey = institutionKey(entry.canonical);
       const keys = new Set([canonicalKey, ...entry.aliases.map(institutionKey)]);
       if (keys.has(rawKey)) return canonicalKey;
@@ -162,25 +164,25 @@
     const entry = normalizeAliasEntry({ canonical, aliases });
     if (!entry) throw new Error('canonical institution is required');
     const canonicalKey = institutionKey(entry.canonical);
-    profile.identity.aliases = profile.identity.aliases.filter(item => institutionKey(item.canonical) !== canonicalKey);
-    profile.identity.aliases.push(entry);
-    saveProfile();
+    preferences.identity.aliases = preferences.identity.aliases.filter(item => institutionKey(item.canonical) !== canonicalKey);
+    preferences.identity.aliases.push(entry);
+    savePreferences();
     return entry;
   }
 
   function removeInstitutionAlias(canonical) {
     const key = institutionKey(canonical);
-    profile.identity.aliases = profile.identity.aliases.filter(item => institutionKey(item.canonical) !== key);
-    saveProfile();
+    preferences.identity.aliases = preferences.identity.aliases.filter(item => institutionKey(item.canonical) !== key);
+    savePreferences();
   }
 
-  function getProfile() { return clone(profile); }
-  function getDefaultPolicy() { return clone(DEFAULT_POLICY); }
-  function getEffectivePolicy() {
+  function getPreferences() { return clone(preferences); }
+  function getDefaults() { return clone(DEFAULTS); }
+  function getEffectivePreferences() {
     return {
       version:1,
       schedule:effectiveSchedule(),
-      identity:{aliases:clone(profile.identity.aliases)}
+      identity:{aliases:clone(preferences.identity.aliases)}
     };
   }
 
@@ -200,14 +202,19 @@
     document.addEventListener('change', onFieldEvent, true);
   }
 
-  globalThis.NMDAPolicyProfile = {
-    PROFILE_KEY,
-    getProfile,
-    getDefaultPolicy,
-    getEffectivePolicy,
+  const api = {
+    PREFERENCES_KEY,
+    PROFILE_KEY:PREFERENCES_KEY,
+    getPreferences,
+    getDefaults,
+    getEffectivePreferences,
+    getProfile:getPreferences,
+    getDefaultPolicy:getDefaults,
+    getEffectivePolicy:getEffectivePreferences,
     effectiveSchedule,
     suggestedStart,
-    saveProfile,
+    savePreferences,
+    saveProfile:savePreferences,
     setScheduleOverride,
     clearScheduleOverride,
     isScheduleFieldExplicit,
@@ -219,4 +226,8 @@
     setInstitutionAlias,
     removeInstitutionAlias
   };
+
+  globalThis.NMDAPreferences = api;
+  // Compatibility alias for 4.0 modules. New modules should consume NMDAPreferences.
+  globalThis.NMDAPolicyProfile = api;
 })();
