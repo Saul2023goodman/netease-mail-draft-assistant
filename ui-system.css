@@ -1,0 +1,2082 @@
+/* NetEase Mail Draft Assistant v2.3 — adaptive decision-canvas UI system
+   Standalone-only visual and layout layer. Business behavior stays in app.js.
+   Principles: one viewport, one task stage, no page-level scroll, readable type,
+   progressive disclosure, and responsive modules instead of squeezed columns. */
+
+#nmda-root {
+  --nmda-bg:#f4f6f8;
+  --nmda-surface:#ffffff;
+  --nmda-surface-soft:#f8fafc;
+  --nmda-surface-blue:#f5f9ff;
+  --nmda-border:#dfe5ec;
+  --nmda-border-strong:#c8d1dc;
+  --nmda-text:#182230;
+  --nmda-muted:#667085;
+  --nmda-subtle:#98a2b3;
+  --nmda-blue:#1769e0;
+  --nmda-blue-dark:#1257bd;
+  --nmda-blue-soft:#eaf2ff;
+  --nmda-green:#16834a;
+  --nmda-green-soft:#eaf8ef;
+  --nmda-amber:#a15c00;
+  --nmda-amber-soft:#fff5df;
+  --nmda-red:#b42318;
+  --nmda-red-soft:#fff0ef;
+  --nmda-radius:12px;
+  --nmda-shadow-sm:0 1px 2px rgba(16,24,40,.04);
+  --nmda-shadow-md:0 8px 24px rgba(16,24,40,.08);
+  --nmda-font:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",sans-serif;
+  font-family:var(--nmda-font);
+}
+
+html.nmda-app-document,
+html.nmda-app-document body.nmda-app-body {
+  min-width:640px !important;
+  width:100%;
+  height:100%;
+  overflow:hidden !important;
+  background:var(--nmda-bg,#f4f6f8);
+}
+
+#nmda-root.nmda-standalone,
+#nmda-root.nmda-standalone #nmda-panel {
+  width:100% !important;
+  height:100% !important;
+  inset:0 !important;
+  border-radius:0 !important;
+}
+
+#nmda-root.nmda-standalone #nmda-panel {
+  display:grid !important;
+  grid-template-columns:70px minmax(0,1fr) !important;
+  grid-template-rows:52px minmax(0,1fr) !important;
+  overflow:hidden !important;
+  background:var(--nmda-bg);
+  border:0 !important;
+  box-shadow:none !important;
+  font-size:14px;
+  line-height:1.5;
+}
+
+/* ---------- global chrome ---------- */
+#nmda-root.nmda-standalone .nmda-head {
+  min-width:0;
+  padding:0 14px !important;
+  gap:12px;
+  border-bottom:1px solid var(--nmda-border);
+  background:rgba(255,255,255,.97);
+}
+.nmda-brand { gap:8px; }
+.nmda-brand-mark {
+  width:30px;
+  height:30px;
+  border-radius:9px;
+  background:linear-gradient(145deg,#1769e0,#1554b8);
+  box-shadow:none;
+  font-size:13px;
+}
+.nmda-title { color:var(--nmda-text); font-size:14px; font-weight:760; letter-spacing:-.01em; }
+.nmda-subtitle { display:none; }
+.nmda-head-actions { min-width:0; gap:8px; }
+.nmda-mail-connection {
+  min-width:250px;
+  min-height:34px;
+  grid-template-columns:10px minmax(0,1fr) auto;
+  gap:9px;
+  padding:3px 4px 3px 9px;
+  border-color:var(--nmda-border-strong);
+  border-radius:10px;
+  box-shadow:none;
+}
+.nmda-mail-connection-copy strong { color:var(--nmda-text); font-size:11px; font-weight:720; }
+.nmda-mail-connection-copy small { display:none; }
+.nmda-mail-open-button { min-height:28px !important; height:28px !important; padding:0 9px !important; font-size:10.5px !important; }
+.nmda-safe-badge {
+  min-height:30px;
+  display:inline-flex;
+  align-items:center;
+  padding:0 10px;
+  border-color:#b7e4c7;
+  border-radius:999px;
+  background:#f0faf3;
+  color:#14713f;
+  font-size:10.5px;
+  font-weight:700;
+  white-space:nowrap;
+}
+
+/* ---------- primary navigation ---------- */
+#nmda-root.nmda-standalone .nmda-tabs {
+  min-width:0;
+  padding:10px 6px !important;
+  gap:7px;
+  border-right:1px solid var(--nmda-border);
+  background:#f8fafc;
+  overflow:hidden;
+}
+.nmda-nav-label { display:none; }
+.nmda-tab {
+  min-height:58px;
+  grid-template-columns:1fr;
+  justify-items:center;
+  gap:4px;
+  padding:7px 3px;
+  border:1px solid transparent;
+  border-radius:10px;
+  color:#475467;
+}
+.nmda-tab:hover { background:#f1f5f9; color:var(--nmda-text); }
+.nmda-tab.is-active {
+  border-color:#b9d5ff;
+  background:var(--nmda-blue-soft);
+  color:#155bc2;
+  box-shadow:inset 3px 0 0 var(--nmda-blue);
+}
+.nmda-tab-icon {
+  width:32px;
+  height:32px;
+  border-radius:9px;
+  background:#eef2f6;
+  color:#64748b;
+}
+.nmda-tab-icon svg { width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+.nmda-tab-icon svg rect { fill:none; }
+.nmda-tab.is-active .nmda-tab-icon { background:#d8e8ff; color:var(--nmda-blue); }
+.nmda-tab strong { font-size:10.5px; font-weight:730; text-align:center; white-space:nowrap; }
+.nmda-tab small { display:none; }
+.nmda-tab.is-active small { color:#4e7fbf; }
+
+/* ---------- viewport ownership ---------- */
+#nmda-root.nmda-standalone .nmda-main {
+  min-width:0;
+  min-height:0;
+  display:grid;
+  grid-template-rows:minmax(0,1fr);
+  overflow:hidden !important;
+  background:var(--nmda-bg);
+}
+#nmda-root.nmda-standalone .nmda-page-head { display:none !important; }
+.nmda-page-head h2 { color:var(--nmda-text); font-size:18px !important; font-weight:760; letter-spacing:-.02em; }
+.nmda-page-head p { margin-top:2px !important; color:var(--nmda-muted); font-size:11.5px !important; }
+#nmda-root.nmda-standalone .nmda-page {
+  grid-row:1 !important;
+  min-width:0;
+  min-height:0;
+  height:100%;
+  padding:10px 12px !important;
+  overflow:hidden !important;
+  scrollbar-gutter:auto !important;
+  overscroll-behavior:none !important;
+}
+
+/* ---------- shared components ---------- */
+.nmda-card,
+.nmda-import-card {
+  gap:12px;
+  padding:15px;
+  border:1px solid var(--nmda-border);
+  border-radius:var(--nmda-radius);
+  background:var(--nmda-surface);
+  box-shadow:var(--nmda-shadow-sm);
+}
+.nmda-card-head { gap:12px; }
+.nmda-card-title { color:var(--nmda-text); font-size:13px; font-weight:740; }
+.nmda-card-desc { margin-top:2px; color:var(--nmda-muted); font-size:11px; line-height:1.45; }
+.nmda-card-subtitle { font-size:12.5px; }
+.nmda-card-kicker { font-size:10px; letter-spacing:.08em; }
+.nmda-label { color:#475467; font-size:11.5px; font-weight:680; }
+.nmda-hint { color:var(--nmda-muted); font-size:10.5px; line-height:1.45; }
+#nmda-panel input[type="text"],
+#nmda-panel input[type="email"],
+#nmda-panel input[type="search"],
+#nmda-panel input[type="number"],
+#nmda-panel input[type="datetime-local"],
+#nmda-panel input[type="file"],
+#nmda-panel textarea,
+#nmda-panel select {
+  min-height:40px;
+  padding:8px 10px;
+  border-color:var(--nmda-border-strong);
+  border-radius:8px;
+  color:var(--nmda-text);
+  font:500 12.5px/1.45 var(--nmda-font);
+}
+#nmda-panel textarea { min-height:78px; }
+#nmda-panel input:focus,#nmda-panel textarea:focus,#nmda-panel select:focus {
+  border-color:#6aa9ff;
+  box-shadow:0 0 0 3px rgba(23,105,224,.11);
+}
+.nmda-btn {
+  min-height:38px;
+  padding:0 12px;
+  border-color:var(--nmda-border-strong);
+  border-radius:8px;
+  color:#344054;
+  font:680 12px/1 var(--nmda-font);
+}
+.nmda-btn:hover { border-color:#98a2b3; background:#f8fafc; }
+.nmda-btn-primary { border-color:var(--nmda-blue); background:var(--nmda-blue); color:#fff; }
+.nmda-btn-primary:hover { border-color:var(--nmda-blue-dark); background:var(--nmda-blue-dark); }
+.nmda-btn-small { min-height:34px; padding:0 10px; font-size:11px; }
+.nmda-text-action { font-size:11px; }
+.nmda-summary,#nmda-status,#nmda-batch-status { font-size:11px; }
+
+/* ---------- batch: stage navigation is a view switch, not a scroll rail ---------- */
+#nmda-root.nmda-standalone .nmda-bulk-workbench {
+  display:grid !important;
+  grid-template-columns:minmax(0,1fr) !important;
+  grid-template-rows:42px minmax(0,1fr) !important;
+  gap:8px !important;
+  align-items:stretch !important;
+  padding:10px 12px !important;
+  overflow:hidden !important;
+}
+.nmda-bulk-workbench > * { min-width:0; }
+.nmda-bulk-workbench > .nmda-process-guide {
+  position:relative !important;
+  inset:auto !important;
+  top:auto !important;
+  grid-column:1 !important;
+  grid-row:1 !important;
+  align-self:stretch !important;
+  z-index:4;
+}
+.nmda-process-guide {
+  min-width:0;
+  display:grid !important;
+  grid-template-columns:72px repeat(4,minmax(0,1fr));
+  align-items:center;
+  gap:4px !important;
+  padding:4px !important;
+  overflow:hidden !important;
+  border:1px solid var(--nmda-border) !important;
+  border-radius:11px !important;
+  background:#fff !important;
+  box-shadow:var(--nmda-shadow-sm) !important;
+}
+.nmda-process-guide-title {
+  min-width:0;
+  margin:0 !important;
+  padding:0 6px !important;
+  border:0 !important;
+}
+.nmda-process-guide-title small { display:none; }
+.nmda-process-guide-title strong { color:#344054; font-size:10.5px; }
+.nmda-process-guide > i { display:none !important; }
+.nmda-process-guide > button[data-flow-step] {
+  min-width:0;
+  min-height:32px !important;
+  display:grid !important;
+  grid-template-columns:24px minmax(0,1fr) !important;
+  grid-template-rows:auto !important;
+  column-gap:6px !important;
+  padding:3px 7px !important;
+  border:1px solid transparent !important;
+  border-radius:8px !important;
+  background:transparent !important;
+  text-align:left !important;
+  cursor:pointer;
+}
+.nmda-process-guide > button[data-flow-step] > span {
+  grid-row:auto !important;
+  width:24px !important;
+  height:24px !important;
+  display:grid;
+  place-items:center;
+  border-radius:8px !important;
+  background:#f0f3f6 !important;
+  color:#667085 !important;
+  font:720 10px/1 var(--nmda-font) !important;
+}
+.nmda-process-guide > button[data-flow-step] strong { display:block !important; color:#344054 !important; font-size:10.5px !important; font-weight:720; white-space:nowrap !important; overflow:hidden; text-overflow:ellipsis; }
+.nmda-process-guide > button[data-flow-step] small { display:none !important; }
+.nmda-process-guide > button[data-state="done"] > span { background:#e9f7ee !important; color:var(--nmda-green) !important; }
+.nmda-process-guide > button[data-state="locked"] { opacity:.52 !important; cursor:not-allowed; }
+.nmda-process-guide > button.is-viewing {
+  border-color:#b9d5ff !important;
+  background:var(--nmda-blue-soft) !important;
+}
+.nmda-process-guide > button.is-viewing > span { background:var(--nmda-blue) !important; color:#fff !important; }
+.nmda-process-guide > button.is-viewing strong { color:#155bc2 !important; }
+.nmda-process-guide > button:not(:disabled):not(.is-viewing):hover { background:#f8fafc !important; }
+
+.nmda-workflow-stage-head,
+.nmda-workflow-stage-separator { display:none !important; }
+
+/* Each stage owns the available area. No outer .nmda-page vertical scrollbar. */
+.nmda-bulk-workbench > .nmda-ingest-workspace,
+.nmda-bulk-workbench > #nmda-preview-card,
+.nmda-bulk-workbench > #nmda-run-card {
+  grid-column:1 !important;
+  grid-row:2 !important;
+  min-height:0;
+}
+.nmda-bulk-workbench[data-view-step="1"] > .nmda-ingest-workspace,
+.nmda-bulk-workbench[data-view-step="2"] > .nmda-ingest-workspace { display:grid !important; }
+.nmda-bulk-workbench[data-view-step="3"] > .nmda-ingest-workspace,
+.nmda-bulk-workbench[data-view-step="4"] > .nmda-ingest-workspace { display:none !important; }
+.nmda-bulk-workbench[data-view-step="1"] > #nmda-preview-card,
+.nmda-bulk-workbench[data-view-step="2"] > #nmda-preview-card { display:none !important; }
+.nmda-bulk-workbench[data-view-step="3"] > #nmda-preview-card,
+.nmda-bulk-workbench[data-view-step="4"] > #nmda-preview-card:not([hidden]) { display:grid !important; }
+.nmda-bulk-workbench[data-view-step="1"] > #nmda-run-card,
+.nmda-bulk-workbench[data-view-step="2"] > #nmda-run-card,
+.nmda-bulk-workbench[data-view-step="3"] > #nmda-run-card { display:none !important; }
+
+/* Import/review stage: one bounded module scroll area, never the page itself. */
+.nmda-ingest-workspace-v2 {
+  height:100%;
+  min-height:0;
+  align-content:start;
+  gap:10px !important;
+  padding:0 2px 2px 0;
+  overflow-y:auto !important;
+  overflow-x:hidden !important;
+  overscroll-behavior:contain;
+  scrollbar-gutter:stable;
+}
+.nmda-ingest-workspace-v2 > .nmda-card { padding:14px; }
+.nmda-bulk-workbench[data-phase="empty"] .nmda-ingest-workspace-v2 {
+  display:grid;
+  place-items:start center;
+  align-content:center;
+  padding:8px max(12px,6vw) 20px;
+}
+.nmda-bulk-workbench[data-phase="empty"] #nmda-import-card {
+  width:min(900px,100%);
+  margin:0 !important;
+  padding:20px !important;
+}
+.nmda-bulk-workbench[data-phase="empty"] #nmda-import-card .nmda-card-title { font-size:17px; }
+.nmda-bulk-workbench[data-phase="empty"] #nmda-import-card .nmda-card-desc { font-size:11.5px; }
+.nmda-source-action-grid { grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; }
+.nmda-source-action {
+  min-height:86px !important;
+  grid-template-columns:38px minmax(0,1fr) !important;
+  column-gap:10px !important;
+  padding:12px !important;
+  border-color:var(--nmda-border) !important;
+  border-radius:10px !important;
+  background:#fff !important;
+}
+.nmda-source-action:hover { border-color:#9dc4ff !important; background:#f8fbff !important; }
+.nmda-source-action-icon { width:36px !important; height:36px !important; border-radius:9px !important; background:#eaf2ff !important; color:var(--nmda-blue) !important; font-size:16px !important; }
+.nmda-source-action strong { font-size:12px !important; }
+.nmda-source-action small { color:var(--nmda-muted); font-size:10.5px !important; }
+.nmda-ingest-source-tools { min-height:36px; }
+.nmda-batch-prep-strip { border-radius:9px; }
+.nmda-context-cue { border-radius:10px; }
+.nmda-context-cue-main > strong { font-size:12px; }
+.nmda-context-cue-main > small { font-size:10.5px; line-height:1.45; }
+.nmda-context-benefits span,.nmda-context-status { font-size:9.8px; }
+.nmda-import-status { min-height:34px; padding:7px 9px; font-size:10.5px; }
+
+/* Review turns the mail editor into the main canvas. */
+.nmda-bulk-workbench.is-review-page-focus .nmda-ingest-workspace-v2 {
+  overflow:hidden !important;
+  padding:0;
+}
+.nmda-bulk-workbench.is-review-page-focus .nmda-inline-review {
+  height:100% !important;
+  min-height:0 !important;
+  margin:0 !important;
+  border-radius:12px !important;
+  overflow:hidden !important;
+}
+.nmda-bulk-workbench.is-review-page-focus .nmda-review-workbench,
+.nmda-bulk-workbench.is-review-page-focus .nmda-review-layout { height:100% !important; min-height:0 !important; }
+.nmda-review-layout {
+  grid-template-columns:230px minmax(0,1fr) !important;
+  max-height:none !important;
+  min-height:0 !important;
+}
+.nmda-review-queue-pane { min-height:0; max-height:none !important; overflow-y:auto; }
+.nmda-review-edit-pane { min-width:0; min-height:0; overflow:hidden; }
+.nmda-review-edit-scroll { min-height:0; overflow-y:auto !important; }
+.nmda-review-pane-title { min-height:48px; padding:9px 12px; }
+.nmda-review-pane-title strong { font-size:12px; }
+.nmda-review-pane-title small { font-size:10px; }
+.nmda-review-search input { min-height:36px !important; font-size:11.5px !important; }
+.nmda-review-filter button { min-height:30px; padding:0 10px; font-size:10px; }
+.nmda-review-queue-main strong { font-size:11px; }
+.nmda-review-queue-main small,.nmda-review-queue-main em { font-size:9.5px; }
+.nmda-review-core-fields input { min-height:40px; font-size:12.5px; }
+.nmda-review-core-fields textarea { min-height:260px !important; font-size:12.5px; line-height:1.7; }
+.nmda-review-actions { padding:10px 12px; }
+
+/* Planning stage: controls + a single table scroll surface. */
+#nmda-preview-card {
+  height:100%;
+  min-height:0;
+  grid-template-rows:auto auto auto minmax(0,1fr);
+  gap:10px;
+  padding:14px;
+  overflow:hidden !important;
+}
+#nmda-preview-card > .nmda-card-head { align-items:center; }
+.nmda-list-head .nmda-card-title { font-size:14px; }
+.nmda-list-head .nmda-card-desc { font-size:10.5px; }
+.nmda-summary-inline { max-width:520px; font-size:10.5px; }
+.nmda-scope-tools { margin:0; border-radius:9px; }
+.nmda-scope-tools > summary { min-height:40px; padding:7px 10px; }
+.nmda-scope-tools > summary strong { font-size:10.5px; }
+.nmda-scope-tools > summary small { font-size:9.5px; }
+.nmda-inline-scheduler { margin:0; border-radius:9px; overflow:hidden; }
+.nmda-inline-scheduler > summary { min-height:40px; padding:8px 10px; }
+.nmda-inline-scheduler > summary strong { font-size:11px; }
+.nmda-inline-scheduler > summary small { font-size:9.5px; }
+.nmda-scheduler-grid { grid-template-columns:minmax(210px,1.3fr) minmax(130px,.6fr) minmax(120px,.55fr) minmax(190px,.85fr); gap:9px; }
+.nmda-scheduler-purpose-note { font-size:10px; line-height:1.45; }
+.nmda-scheduler-holiday-toggle strong { font-size:10px; }
+.nmda-scheduler-holiday-toggle small { font-size:9px; }
+.nmda-scheduler-actions { grid-template-columns:minmax(220px,1fr) auto auto; }
+.nmda-schedule-rule-preview { font-size:10.5px; }
+.nmda-batch-table-wrap {
+  min-height:0 !important;
+  max-height:none !important;
+  height:100%;
+  overflow:auto !important;
+  border-radius:9px;
+  contain:none !important;
+  scrollbar-gutter:stable;
+}
+.nmda-batch-table { min-width:760px; width:100%; table-layout:fixed; }
+.nmda-table { font-size:11px; }
+.nmda-table th,.nmda-table td { padding:9px 10px; }
+.nmda-table th { font-size:10.5px; }
+.nmda-table td { font-size:11px; }
+.nmda-recipient-cell strong { display:block; font-size:11px; }
+.nmda-recipient-cell small { display:block; margin-top:2px; font-size:9.5px; }
+.nmda-schedule-edit-cell input { min-height:34px !important; font-size:10.5px !important; }
+.nmda-schedule-edit-cell small { font-size:9px; }
+
+/* Create stage: command card is a deliberate stage, never a floating overlap. */
+.nmda-bulk-workbench[data-view-step="4"] {
+  grid-template-rows:auto minmax(0,1fr) auto !important;
+}
+.nmda-bulk-workbench[data-view-step="4"] > #nmda-preview-card:not([hidden]) {
+  grid-row:2 !important;
+  opacity:.96;
+}
+.nmda-bulk-workbench[data-view-step="4"] > #nmda-run-card:not([hidden]) {
+  display:grid !important;
+  grid-row:3 !important;
+}
+.nmda-create-stage {
+  grid-template-columns:minmax(0,1fr) auto !important;
+  align-items:center;
+  gap:16px !important;
+  padding:12px 14px !important;
+  border-color:#b9d5ff !important;
+  border-radius:11px !important;
+  background:#f5f9ff !important;
+  box-shadow:none !important;
+}
+.nmda-create-stage.is-attention { box-shadow:0 0 0 3px rgba(23,105,224,.12) !important; }
+.nmda-create-stage .nmda-card-title { font-size:13px !important; }
+.nmda-create-stage .nmda-run-status { margin-top:2px; color:#475467; font-size:10.5px; }
+.nmda-create-stage .nmda-create-preflight { margin-top:5px; font-size:10px; }
+.nmda-create-stage .nmda-create-preflight em { font-size:9.5px; }
+.nmda-create-stage .nmda-run-controls { display:flex; align-items:center; gap:8px; width:auto; }
+.nmda-create-stage .nmda-run-controls .nmda-btn { min-width:118px; }
+
+/* ---------- single draft: no outer scroll ---------- */
+[data-pane="single"].nmda-page { overflow:hidden !important; }
+.nmda-single-grid {
+  height:100%;
+  min-height:0;
+  grid-template-columns:minmax(0,1.75fr) minmax(300px,.72fr);
+  gap:14px;
+}
+.nmda-compose-card { min-height:0; grid-template-rows:auto auto auto minmax(0,1fr); padding:15px; }
+.nmda-grow-field { min-height:0; }
+#nmda-body-text { height:100%; min-height:180px !important; resize:none; overflow:auto; font-size:12.5px; line-height:1.7; }
+.nmda-side-stack { min-height:0; gap:10px; }
+.nmda-single-options-card { gap:10px; }
+.nmda-action-card { position:static !important; }
+
+/* ---------- contacts: table owns scrolling ---------- */
+[data-pane="contacts"].nmda-page {
+  display:grid;
+  grid-template-rows:auto minmax(0,1fr);
+  gap:10px;
+  overflow:hidden !important;
+}
+.nmda-crm-top-grid { margin:0; }
+.nmda-contact-command-card { padding:12px 14px; }
+.nmda-contact-sync-line { grid-template-columns:minmax(180px,.75fr) minmax(260px,1.25fr); }
+.nmda-contact-sync-line .nmda-read-meta,#nmda-contact-status { min-height:34px; font-size:10.5px; }
+.nmda-contact-list-card {
+  height:100%;
+  min-height:0 !important;
+  grid-template-rows:auto auto auto minmax(0,1fr);
+  padding:14px;
+}
+.nmda-contact-toolbar-unified { grid-template-columns:minmax(220px,1fr) minmax(220px,.8fr); }
+.nmda-contact-toolbar-unified input { min-height:40px !important; height:40px !important; font-size:12px !important; }
+.nmda-contact-table-wrap { min-height:0 !important; max-height:none !important; height:100%; overflow:auto !important; }
+.nmda-contact-table { min-width:860px; }
+
+/* ---------- file-purpose modal: one viewport-bounded workspace ---------- */
+#nmda-root.nmda-standalone .nmda-supplement-preflight,
+#nmda-root.nmda-standalone .nmda-attachment-manager-overlay {
+  padding:18px !important;
+  overflow:hidden !important;
+  align-items:stretch !important;
+  justify-items:center !important;
+  background:rgba(31,41,55,.42);
+  backdrop-filter:blur(4px);
+}
+#nmda-root.nmda-standalone .nmda-classify-dialog {
+  width:min(1240px,calc(100vw - 36px)) !important;
+  height:calc(100dvh - 36px) !important;
+  max-height:calc(100dvh - 36px) !important;
+  grid-template-rows:auto minmax(0,1fr) auto !important;
+  margin:0 auto !important;
+  overflow:hidden !important;
+  border:1px solid rgba(255,255,255,.55);
+  border-radius:16px !important;
+  background:#fff;
+  box-shadow:0 24px 60px rgba(16,24,40,.24) !important;
+}
+.nmda-classify-head {
+  min-height:76px;
+  padding:13px 16px !important;
+  border-bottom:1px solid var(--nmda-border);
+  background:#fff;
+}
+.nmda-classify-head-main { gap:11px; }
+.nmda-supplement-head-icon { width:38px; height:38px; border-radius:10px; font-size:15px; }
+.nmda-supplement-kicker { color:var(--nmda-blue); font-size:10px; font-weight:720; }
+.nmda-classify-head h3 { margin:1px 0 0; font-size:17px; }
+.nmda-classify-head p { margin:2px 0 0; color:var(--nmda-muted); font-size:10.5px; line-height:1.45; }
+.nmda-classify-head-summary { gap:6px; }
+.nmda-classify-head-summary > * { min-height:34px; }
+.nmda-classify-workspace {
+  min-height:0;
+  display:grid !important;
+  grid-template-columns:190px minmax(360px,1fr) minmax(300px,340px) !important;
+  overflow:hidden !important;
+}
+.nmda-classify-sidebar,
+.nmda-classify-source-pane,
+.nmda-classify-inspector { min-width:0; min-height:0; }
+.nmda-classify-sidebar { overflow-y:auto !important; border-right:1px solid var(--nmda-border); }
+.nmda-classify-source-pane { overflow:hidden !important; }
+.nmda-classify-source-list { min-height:0; overflow-y:auto !important; }
+.nmda-classify-inspector { overflow-y:auto !important; border-left:1px solid var(--nmda-border); }
+.nmda-classify-pane-head { min-height:52px; padding:9px 11px; }
+.nmda-classify-pane-head span { font-size:9.5px; }
+.nmda-classify-pane-head strong { font-size:11.5px; }
+.nmda-classify-directory-nav button { min-height:36px; font-size:10.5px; }
+.nmda-classify-upload-dock { padding:10px; }
+.nmda-classify-upload-dock-head strong { font-size:10.5px; }
+.nmda-classify-upload-dock-head small { font-size:9px; }
+.nmda-supplement-box-compact { padding:8px; }
+.nmda-supplement-box-main strong { font-size:10.5px; }
+.nmda-supplement-box-main small { font-size:9.5px; }
+.nmda-classify-source-row { min-height:70px; }
+.nmda-classify-source-row strong { font-size:11px; }
+.nmda-classify-source-row small { font-size:9.5px; }
+.nmda-source-inspector-head strong { font-size:12.5px; }
+.nmda-source-inspector-head small { font-size:9.5px; }
+.nmda-source-inspector-section-title { font-size:11px; }
+.nmda-source-inspector-field { font-size:10.5px; }
+.nmda-source-inspector-body { font-size:11px; line-height:1.65; }
+.nmda-supplement-foot {
+  min-height:62px;
+  padding:10px 16px !important;
+  border-top:1px solid var(--nmda-border);
+  background:#fff;
+  box-shadow:none !important;
+}
+
+/* ---------- responsive behavior ---------- */
+@media (max-width:1180px) {
+  #nmda-root.nmda-standalone #nmda-panel { grid-template-columns:176px minmax(0,1fr) !important; }
+  .nmda-mail-connection { min-width:230px; }
+  .nmda-mail-connection-copy small { display:none; }
+  .nmda-process-guide { grid-template-columns:90px repeat(4,minmax(100px,1fr)); }
+  .nmda-process-guide > button[data-flow-step] small { display:none !important; }
+  .nmda-process-guide > button[data-flow-step] { grid-template-rows:1fr !important; }
+  .nmda-process-guide > button[data-flow-step] > span { grid-row:1 !important; }
+  .nmda-scheduler-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .nmda-classify-workspace { grid-template-columns:175px minmax(330px,1fr) 300px !important; }
+}
+
+@media (max-width:980px) {
+  #nmda-root.nmda-standalone #nmda-panel { grid-template-columns:72px minmax(0,1fr) !important; }
+  #nmda-root.nmda-standalone .nmda-tabs { padding:14px 8px !important; }
+  .nmda-nav-label,.nmda-tab > span:not(.nmda-tab-icon) { display:none !important; }
+  .nmda-tab { grid-template-columns:1fr; justify-items:center; min-height:48px; padding:6px; }
+  .nmda-tab-icon { width:34px; height:34px; }
+  .nmda-mail-connection { min-width:0; grid-template-columns:10px auto; }
+  .nmda-mail-connection-copy { display:none; }
+  .nmda-safe-badge { display:none !important; }
+  .nmda-process-guide { grid-template-columns:repeat(4,minmax(0,1fr)); }
+  .nmda-process-guide-title { display:none !important; }
+  .nmda-process-guide > button[data-flow-step] { grid-template-columns:26px minmax(0,1fr) !important; min-height:42px !important; }
+  .nmda-process-guide > button[data-flow-step] > span { width:26px !important; height:26px !important; }
+  .nmda-process-guide > button[data-flow-step] strong { font-size:10.5px !important; }
+  .nmda-source-action-grid { grid-template-columns:repeat(3,minmax(0,1fr)) !important; }
+  .nmda-source-action small { display:none; }
+  .nmda-source-action { min-height:68px !important; }
+  .nmda-single-grid { grid-template-columns:minmax(0,1fr) 280px; }
+  .nmda-classify-workspace { grid-template-columns:150px minmax(300px,1fr) 270px !important; }
+  .nmda-classify-head-summary { display:none; }
+}
+
+@media (max-width:820px) {
+  html.nmda-app-document,html.nmda-app-document body.nmda-app-body { min-width:0 !important; }
+  #nmda-root.nmda-standalone #nmda-panel { grid-template-columns:64px minmax(0,1fr) !important; grid-template-rows:62px minmax(0,1fr) !important; }
+  #nmda-root.nmda-standalone .nmda-head { padding:0 10px 0 12px !important; }
+  .nmda-brand-mark { width:32px; height:32px; }
+  .nmda-title { font-size:13px; }
+  .nmda-subtitle { display:none; }
+  .nmda-mail-connection { border:0; background:transparent !important; padding:0; }
+  .nmda-mail-open-button { min-height:34px !important; height:34px !important; }
+  #nmda-root.nmda-standalone .nmda-main { grid-template-rows:54px minmax(0,1fr); }
+  #nmda-root.nmda-standalone .nmda-page-head { min-height:54px; padding:8px 12px !important; }
+  .nmda-page-head h2 { font-size:16px !important; }
+  .nmda-page-head p { display:none; }
+  #nmda-root.nmda-standalone .nmda-page { padding:10px !important; }
+  #nmda-root.nmda-standalone .nmda-bulk-workbench { padding:9px 10px 10px !important; gap:8px !important; }
+  .nmda-process-guide { gap:4px !important; padding:4px !important; }
+  .nmda-process-guide > button[data-flow-step] { grid-template-columns:1fr !important; justify-items:center; padding:5px 3px !important; text-align:center !important; }
+  .nmda-process-guide > button[data-flow-step] > span { grid-row:auto !important; }
+  .nmda-process-guide > button[data-flow-step] strong { display:none !important; }
+  .nmda-bulk-workbench[data-phase="empty"] .nmda-ingest-workspace-v2 { align-content:start; padding:2px; }
+  .nmda-bulk-workbench[data-phase="empty"] #nmda-import-card { padding:14px !important; }
+  .nmda-source-action-grid { grid-template-columns:1fr !important; }
+  .nmda-source-action { min-height:54px !important; grid-template-columns:32px minmax(0,1fr) !important; }
+  .nmda-source-action-icon { width:32px !important; height:32px !important; }
+  .nmda-source-action small { display:block; }
+  .nmda-scheduler-grid,.nmda-scheduler-actions { grid-template-columns:1fr; }
+  .nmda-scheduler-policy-row { align-items:stretch; flex-direction:column; }
+  .nmda-scheduler-holiday-toggle { width:100%; }
+  .nmda-create-stage { grid-template-columns:1fr !important; gap:8px !important; }
+  .nmda-create-stage .nmda-run-controls { width:100%; }
+  .nmda-create-stage .nmda-run-controls .nmda-btn { flex:1; }
+  .nmda-single-grid { grid-template-columns:1fr; overflow-y:auto; }
+  .nmda-compose-card { min-height:520px; }
+  .nmda-action-card { margin-bottom:8px; }
+  .nmda-contact-sync-line,.nmda-contact-toolbar-unified { grid-template-columns:1fr; }
+  .nmda-classify-dialog { width:calc(100vw - 16px) !important; height:calc(100dvh - 16px) !important; max-height:calc(100dvh - 16px) !important; }
+  #nmda-root.nmda-standalone .nmda-supplement-preflight { padding:8px !important; }
+  .nmda-classify-workspace { grid-template-columns:128px minmax(280px,1fr) !important; }
+  .nmda-classify-inspector { display:none; }
+  .nmda-classify-head { min-height:68px; padding:10px 12px !important; }
+  .nmda-classify-head p { display:none; }
+}
+
+@media (max-height:720px) {
+  #nmda-root.nmda-standalone #nmda-panel { grid-template-rows:60px minmax(0,1fr) !important; }
+  #nmda-root.nmda-standalone .nmda-main { grid-template-rows:50px minmax(0,1fr); }
+  #nmda-root.nmda-standalone .nmda-page-head { min-height:50px; padding-top:6px !important; padding-bottom:6px !important; }
+  .nmda-page-head p { display:none; }
+  .nmda-process-guide > button[data-flow-step] { min-height:38px !important; }
+  .nmda-source-action { min-height:62px !important; }
+  .nmda-bulk-workbench[data-phase="empty"] #nmda-import-card { padding:14px !important; }
+  .nmda-classify-head { min-height:64px; }
+  .nmda-supplement-foot { min-height:54px; }
+}
+
+/* Modal owns interaction while open; background modules must not remain scroll owners. */
+#nmda-panel.has-modal .nmda-ingest-workspace-v2 { overflow:hidden !important; }
+.nmda-classify-upload-dock .nmda-supplement-actions .nmda-btn-small,
+.nmda-classify-upload-dock .nmda-supplement-actions label.nmda-btn-small {
+  min-height:32px !important;
+  height:32px !important;
+  padding:0 9px !important;
+  font-size:10px !important;
+}
+
+/* Empty state sits near the workflow header instead of floating in unused space. */
+.nmda-bulk-workbench[data-phase="empty"] .nmda-ingest-workspace-v2 {
+  align-content:start;
+  padding-top:24px;
+}
+
+@media (max-width:820px) {
+  .nmda-classify-inspector-pane { display:none !important; }
+  .nmda-classify-workspace { grid-template-columns:128px minmax(0,1fr) !important; }
+}
+
+/* Narrow file review is a drill-in flow, never an overlapping third pane. */
+.nmda-source-inspector-close { display:none !important; }
+@media (max-width:820px) {
+  .nmda-classify-inspector-pane { display:none !important; }
+  .nmda-classify-workspace { grid-template-columns:128px minmax(0,1fr) !important; }
+  .nmda-classify-workspace:has(#nmda-source-inspector-card:not([hidden])) .nmda-classify-main {
+    display:none !important;
+  }
+  .nmda-classify-workspace:has(#nmda-source-inspector-card:not([hidden])) .nmda-classify-inspector-pane {
+    display:block !important;
+    grid-column:2 !important;
+    min-width:0 !important;
+    overflow-y:auto !important;
+    border-left:0 !important;
+    background:#fff;
+  }
+  .nmda-source-inspector-card-head {
+    display:grid !important;
+    grid-template-columns:32px minmax(0,1fr) !important;
+    align-items:center !important;
+    gap:8px !important;
+  }
+  .nmda-source-inspector-close {
+    display:inline-grid !important;
+    place-items:center;
+    width:32px !important;
+    min-width:32px !important;
+    height:32px !important;
+    border:1px solid var(--nmda-border) !important;
+    border-radius:8px !important;
+    background:#fff !important;
+    color:var(--nmda-text) !important;
+    font-size:15px !important;
+    cursor:pointer;
+  }
+}
+
+/* File rows keep their natural density; extra panel height stays available for scanning. */
+.nmda-classify-file-list,
+.nmda-preflight-source-routing-list {
+  align-content:start !important;
+  grid-auto-rows:max-content !important;
+}
+
+@media (max-width:820px) {
+  .nmda-classify-workspace:has(#nmda-source-inspector-card:not([hidden])) .nmda-classify-inspector-pane {
+    width:100% !important;
+    max-width:none !important;
+  }
+  .nmda-classify-workspace:has(#nmda-source-inspector-card:not([hidden])) .nmda-source-inspector-card {
+    width:100% !important;
+    max-width:none !important;
+  }
+}
+
+/* Step 4 is final confirmation + creation, not a duplicate scheduling screen. */
+.nmda-bulk-workbench[data-view-step="4"] > #nmda-preview-card:not([hidden]) {
+  grid-template-rows:auto minmax(0,1fr) !important;
+}
+.nmda-bulk-workbench[data-view-step="4"] #nmda-scope-tools,
+.nmda-bulk-workbench[data-view-step="4"] #nmda-scheduler-card {
+  display:none !important;
+}
+.nmda-bulk-workbench[data-view-step="4"] #nmda-preview-card .nmda-card-desc {
+  display:none !important;
+}
+
+/* Visibility is a state contract. Layout rules must never resurrect hidden modules. */
+#nmda-root.nmda-standalone [hidden] {
+  display:none !important;
+}
+
+/* Single-draft stays a two-pane task on compact windows; do not turn it into a long page. */
+@media (max-width:820px) {
+  .nmda-single-grid {
+    grid-template-columns:minmax(0,1fr) minmax(220px,250px) !important;
+    gap:10px !important;
+    overflow:hidden !important;
+  }
+  .nmda-compose-card { min-height:0 !important; }
+  .nmda-side-stack { min-height:0 !important; overflow:hidden !important; }
+  .nmda-single-options-card,.nmda-action-card { padding:11px !important; }
+  .nmda-single-options-card .nmda-card-desc,.nmda-action-card .nmda-card-desc { display:none; }
+}
+
+/* On minimum width, planning becomes one intentional scrollable stage.
+   The page stays fixed; scheduler and mail table travel together inside this module. */
+@media (max-width:820px) {
+  .nmda-bulk-workbench[data-view-step="3"] > #nmda-preview-card:not([hidden]) {
+    grid-template-rows:auto auto auto auto !important;
+    overflow-y:auto !important;
+    overflow-x:hidden !important;
+    scrollbar-gutter:stable;
+    overscroll-behavior:contain;
+  }
+  .nmda-bulk-workbench[data-view-step="3"] .nmda-batch-table-wrap {
+    height:auto !important;
+    min-height:190px !important;
+    overflow-x:auto !important;
+    overflow-y:visible !important;
+  }
+}
+@media (max-width:820px) {
+  .nmda-bulk-workbench[data-view-step="3"] > #nmda-preview-card:not([hidden]) {
+    grid-template-rows:max-content max-content max-content max-content !important;
+  }
+  .nmda-bulk-workbench[data-view-step="3"] #nmda-scheduler-card {
+    overflow:visible !important;
+  }
+}
+
+/* ========================================================================== 
+   v2.2 — Decision-first workflow refactor
+   Structural goal: each screen answers one user question. Supplemental data is
+   no longer squeezed into the file-navigation rail; planning is a two-pane task.
+   ========================================================================== */
+
+/* --- Stage 1: importing never owns a page-like vertical scrollbar. --- */
+#nmda-root.nmda-standalone .nmda-ingest-workspace-v2 {
+  display:grid !important;
+  grid-template-columns:minmax(0,1fr) !important;
+  grid-template-rows:minmax(0,1fr) !important;
+  height:100% !important;
+  min-height:0 !important;
+  align-content:stretch !important;
+  padding:0 !important;
+  overflow:hidden !important;
+  scrollbar-gutter:auto !important;
+}
+#nmda-root.nmda-standalone .nmda-ingest-workspace-v2 > #nmda-import-card {
+  min-width:0;
+  min-height:0;
+  max-height:100%;
+  align-self:start;
+  overflow:hidden !important;
+}
+/* The classification workspace is now the file inventory. Repeating that list on
+   the import canvas creates a second navigation surface and unnecessary scroll. */
+#nmda-root.nmda-standalone #nmda-source-inventory { display:none !important; }
+/* Optional roster setup belongs to “批次资料”, not the primary import canvas. */
+#nmda-root.nmda-standalone #nmda-import-card .nmda-roster-context-cue { display:none !important; }
+
+#nmda-root.nmda-standalone .nmda-bulk-workbench[data-phase="empty"] .nmda-ingest-workspace-v2 {
+  place-items:center !important;
+  align-content:center !important;
+  padding:0 clamp(12px,5vw,64px) !important;
+}
+#nmda-root.nmda-standalone .nmda-bulk-workbench[data-phase="empty"] #nmda-import-card {
+  width:min(920px,100%) !important;
+  height:auto !important;
+  padding:22px !important;
+}
+#nmda-root.nmda-standalone #nmda-import-card[data-loaded="1"] {
+  display:grid;
+  grid-template-columns:minmax(0,1fr);
+  gap:10px !important;
+  padding:16px !important;
+}
+#nmda-root.nmda-standalone #nmda-import-card[data-loaded="1"] .nmda-card-head {
+  padding-bottom:2px;
+}
+#nmda-root.nmda-standalone #nmda-import-card[data-loaded="1"] .nmda-source-action-grid {
+  grid-template-columns:repeat(3,minmax(0,1fr)) !important;
+  gap:8px !important;
+}
+#nmda-root.nmda-standalone #nmda-import-card[data-loaded="1"] .nmda-source-action {
+  min-height:54px !important;
+  grid-template-columns:30px minmax(0,1fr) !important;
+  padding:9px 10px !important;
+}
+#nmda-root.nmda-standalone #nmda-import-card[data-loaded="1"] .nmda-source-action-icon {
+  width:30px !important;
+  height:30px !important;
+  border-radius:8px !important;
+  font-size:13px !important;
+}
+#nmda-root.nmda-standalone #nmda-import-card[data-loaded="1"] .nmda-source-action strong { font-size:11.5px !important; }
+#nmda-root.nmda-standalone #nmda-import-card[data-loaded="1"] .nmda-source-action small { display:none !important; }
+#nmda-root.nmda-standalone #nmda-import-card[data-loaded="1"] .nmda-ingest-source-tools {
+  min-height:32px;
+  margin:0;
+}
+#nmda-root.nmda-standalone #nmda-import-card[data-loaded="1"] .nmda-batch-prep-strip {
+  min-height:58px;
+  margin:0;
+}
+#nmda-root.nmda-standalone #nmda-import-card[data-loaded="1"] .nmda-import-status {
+  min-height:32px;
+  margin:0;
+}
+
+/* --- Import review modal: two explicit task views instead of four competing panes. --- */
+#nmda-root.nmda-standalone .nmda-classify-dialog {
+  width:min(1280px,calc(100vw - 36px)) !important;
+  height:calc(100dvh - 36px) !important;
+  max-height:calc(100dvh - 36px) !important;
+  display:grid !important;
+  grid-template-rows:auto auto minmax(0,1fr) auto !important;
+  overflow:hidden !important;
+}
+.nmda-classify-modebar {
+  min-width:0;
+  min-height:52px;
+  display:flex;
+  align-items:center;
+  gap:8px;
+  padding:7px 14px;
+  border-bottom:1px solid var(--nmda-border);
+  background:#fbfcfe;
+}
+.nmda-classify-modebar button {
+  min-width:150px;
+  min-height:38px;
+  display:grid;
+  grid-template-columns:24px auto auto;
+  align-items:center;
+  justify-content:start;
+  gap:7px;
+  padding:5px 10px;
+  border:1px solid transparent;
+  border-radius:9px;
+  background:transparent;
+  color:#667085;
+  cursor:pointer;
+  font-family:var(--nmda-font);
+}
+.nmda-classify-modebar button > span {
+  width:24px;
+  height:24px;
+  display:grid;
+  place-items:center;
+  border-radius:7px;
+  background:#eef2f6;
+  color:#667085;
+  font-size:10px;
+  font-weight:750;
+}
+.nmda-classify-modebar button strong { color:#344054; font-size:11.5px; font-weight:730; }
+.nmda-classify-modebar button small { color:#98a2b3; font-size:10px; }
+.nmda-classify-modebar button.is-active {
+  border-color:#bfd7fb;
+  background:#eef5ff;
+  color:var(--nmda-blue);
+}
+.nmda-classify-modebar button.is-active > span { background:var(--nmda-blue); color:#fff; }
+.nmda-classify-modebar button.is-active strong { color:#155bc2; }
+
+#nmda-root.nmda-standalone .nmda-classify-workspace {
+  min-width:0;
+  min-height:0;
+  display:block !important;
+  overflow:hidden !important;
+  background:#f8fafc;
+}
+.nmda-classify-files-view {
+  width:100%;
+  height:100%;
+  min-width:0;
+  min-height:0;
+  display:grid;
+  grid-template-columns:190px minmax(360px,1fr) minmax(300px,350px);
+  overflow:hidden;
+}
+.nmda-classify-files-view[hidden],
+.nmda-classify-support-view[hidden] { display:none !important; }
+
+/* Directory rail is navigation only. Its child list may scroll; the rail itself never does. */
+#nmda-root.nmda-standalone .nmda-classify-files-view > .nmda-classify-sidebar {
+  min-height:0;
+  overflow:hidden !important;
+  display:grid !important;
+  grid-template-rows:auto minmax(0,1fr) !important;
+  border-right:1px solid var(--nmda-border);
+}
+#nmda-root.nmda-standalone .nmda-classify-directory-nav {
+  min-height:0;
+  overflow-y:auto !important;
+  overflow-x:hidden !important;
+  scrollbar-width:thin;
+  scrollbar-color:#cbd5e1 transparent;
+}
+/* Main list owns the only visible vertical scroll bar on the file-list view. */
+#nmda-root.nmda-standalone .nmda-classify-main {
+  min-width:0;
+  min-height:0;
+  overflow:hidden !important;
+}
+#nmda-root.nmda-standalone .nmda-preflight-source-routing-list {
+  min-height:0;
+  overflow-y:auto !important;
+  overflow-x:hidden !important;
+  scrollbar-gutter:stable;
+  overscroll-behavior:contain;
+}
+/* Inspector is a detail surface. Keep its chrome fixed and scroll the actual content. */
+#nmda-root.nmda-standalone .nmda-classify-inspector-pane {
+  min-width:0;
+  min-height:0;
+  overflow:hidden !important;
+  display:grid;
+  grid-template-rows:minmax(0,1fr);
+  border-left:1px solid var(--nmda-border);
+  background:#fff;
+}
+#nmda-root.nmda-standalone .nmda-source-inspector-card {
+  min-height:0;
+  height:100%;
+  display:grid;
+  grid-template-rows:auto auto auto minmax(0,1fr) auto;
+  overflow:hidden;
+}
+#nmda-root.nmda-standalone .nmda-source-inspector-content {
+  min-height:0;
+  overflow-y:auto !important;
+  overflow-x:hidden !important;
+  overscroll-behavior:contain;
+}
+#nmda-root.nmda-standalone .nmda-source-inspector-empty {
+  align-self:center;
+  padding:24px 18px;
+}
+
+/* Batch material view receives the full canvas. The roster and attachments are no
+   longer compressed inside the directory rail. */
+.nmda-classify-support-view {
+  height:100%;
+  min-width:0;
+  min-height:0;
+  display:grid;
+  grid-template-rows:auto minmax(0,1fr);
+  gap:0;
+  overflow:hidden;
+  background:#f7f9fc;
+}
+.nmda-support-view-head {
+  min-height:58px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:16px;
+  padding:10px 18px;
+  border-bottom:1px solid var(--nmda-border);
+  background:#fff;
+}
+.nmda-support-view-head > div { display:grid; gap:1px; }
+.nmda-support-view-head span { color:var(--nmda-blue); font-size:10px; font-weight:720; }
+.nmda-support-view-head strong { color:var(--nmda-text); font-size:14px; font-weight:750; }
+.nmda-support-view-head small { color:var(--nmda-muted); font-size:10.5px; }
+#nmda-root.nmda-standalone .nmda-classify-support-view .nmda-classify-upload-dock {
+  min-width:0;
+  min-height:0;
+  margin:0 !important;
+  padding:18px !important;
+  border:0 !important;
+  border-radius:0 !important;
+  background:transparent !important;
+  overflow:hidden !important;
+}
+.nmda-classify-support-view .nmda-classify-upload-dock-head { display:none !important; }
+.nmda-classify-support-view .nmda-classify-supplement-stack {
+  height:100%;
+  min-height:0;
+  display:grid !important;
+  grid-template-columns:minmax(280px,.8fr) minmax(420px,1.35fr);
+  gap:14px !important;
+  padding:0 !important;
+  border:0 !important;
+}
+#nmda-root.nmda-standalone .nmda-classify-support-view .nmda-supplement-box-compact {
+  min-width:0;
+  min-height:0;
+  height:100%;
+  display:grid !important;
+  grid-template-columns:42px minmax(0,1fr) !important;
+  grid-template-rows:auto minmax(0,1fr) auto;
+  align-items:start;
+  gap:10px 12px !important;
+  padding:16px !important;
+  border:1px solid var(--nmda-border) !important;
+  border-radius:12px !important;
+  background:#fff !important;
+  box-shadow:var(--nmda-shadow-sm) !important;
+  overflow:hidden;
+}
+#nmda-root.nmda-standalone .nmda-classify-support-view .nmda-supplement-box-icon {
+  width:42px !important;
+  height:42px !important;
+  border-radius:10px !important;
+  font-size:14px !important;
+}
+#nmda-root.nmda-standalone .nmda-classify-support-view .nmda-supplement-box-main {
+  min-height:0;
+  display:grid;
+  align-content:start;
+  gap:6px;
+  overflow:hidden;
+}
+#nmda-root.nmda-standalone .nmda-classify-support-view .nmda-supplement-box-main > strong {
+  font-size:13px !important;
+  line-height:1.4;
+}
+#nmda-root.nmda-standalone .nmda-classify-support-view .nmda-supplement-box-main > small {
+  display:block !important;
+  font-size:10.5px !important;
+  line-height:1.5;
+  color:var(--nmda-muted);
+}
+#nmda-root.nmda-standalone .nmda-classify-support-view .nmda-supplement-status {
+  width:max-content;
+  max-width:100%;
+  margin:0;
+  padding:4px 7px;
+  font-size:10px !important;
+}
+#nmda-root.nmda-standalone .nmda-classify-support-view .nmda-supplement-actions {
+  grid-column:1 / -1 !important;
+  display:flex;
+  align-items:center;
+  flex-wrap:wrap;
+  gap:8px !important;
+  padding:0 !important;
+}
+#nmda-root.nmda-standalone .nmda-classify-support-view .nmda-supplement-actions .nmda-btn-small,
+#nmda-root.nmda-standalone .nmda-classify-support-view .nmda-supplement-actions label.nmda-btn-small {
+  min-height:36px !important;
+  height:36px !important;
+  padding:0 12px !important;
+  font-size:11px !important;
+}
+#nmda-root.nmda-standalone .nmda-classify-support-view .nmda-attachment-assets-inline {
+  min-height:0;
+  max-height:none !important;
+  overflow:hidden !important;
+  display:grid;
+  grid-template-rows:auto minmax(0,1fr);
+}
+#nmda-root.nmda-standalone .nmda-classify-support-view .nmda-attachment-assets-list {
+  min-height:0;
+  overflow-y:auto !important;
+  overscroll-behavior:contain;
+}
+
+/* Header and footer are calmer: status, task switch, content, action. */
+#nmda-root.nmda-standalone .nmda-classify-head { min-height:70px; padding:11px 16px !important; }
+#nmda-root.nmda-standalone .nmda-classify-head h3 { font-size:17px; }
+#nmda-root.nmda-standalone .nmda-classify-head p { font-size:10.5px; }
+#nmda-root.nmda-standalone .nmda-classify-foot { min-height:60px; padding:9px 16px !important; }
+#nmda-root.nmda-standalone .nmda-classify-foot-summary strong { font-size:11px; }
+#nmda-root.nmda-standalone .nmda-classify-foot-summary small { font-size:9.5px; }
+
+/* --- Stage 3: planning is a two-pane task, not a compressed horizontal form. --- */
+#nmda-root.nmda-standalone .nmda-bulk-workbench[data-view-step="3"] > #nmda-preview-card:not([hidden]) {
+  min-width:0;
+  min-height:0;
+  height:100%;
+  display:grid !important;
+  grid-template-columns:minmax(286px,326px) minmax(0,1fr) !important;
+  grid-template-rows:auto auto minmax(0,1fr) !important;
+  gap:10px 12px !important;
+  padding:14px !important;
+  overflow:hidden !important;
+}
+#nmda-root.nmda-standalone .nmda-bulk-workbench[data-view-step="3"] #nmda-preview-card > .nmda-card-head {
+  grid-column:1 / -1;
+  grid-row:1;
+  min-width:0;
+}
+#nmda-root.nmda-standalone .nmda-bulk-workbench[data-view-step="3"] #nmda-scope-tools {
+  grid-column:2;
+  grid-row:2;
+  min-width:0;
+  margin:0;
+}
+#nmda-root.nmda-standalone .nmda-bulk-workbench[data-view-step="3"] #nmda-scheduler-card {
+  grid-column:1;
+  grid-row:2 / 4;
+  min-width:0;
+  min-height:0;
+  height:100%;
+  margin:0;
+  display:grid !important;
+  grid-template-rows:auto auto auto auto minmax(0,1fr);
+  align-content:start;
+  overflow:hidden !important;
+  border:1px solid #cbdcf5;
+  border-radius:11px;
+  background:#f8fbff;
+}
+#nmda-root.nmda-standalone .nmda-bulk-workbench[data-view-step="3"] #nmda-scheduler-card > summary {
+  min-height:48px;
+  padding:9px 11px;
+  border-bottom:1px solid #dbe7f7;
+  background:#f2f7ff;
+}
+#nmda-root.nmda-standalone .nmda-bulk-workbench[data-view-step="3"] #nmda-scheduler-card > summary strong { font-size:12px; }
+#nmda-root.nmda-standalone .nmda-bulk-workbench[data-view-step="3"] #nmda-scheduler-card > summary small {
+  max-width:230px;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  font-size:9.5px;
+}
+#nmda-root.nmda-standalone .nmda-bulk-workbench[data-view-step="3"] #nmda-scheduler-toggle-label { display:none !important; }
+#nmda-root.nmda-standalone .nmda-bulk-workbench[data-view-step="3"] .nmda-stage-preflight {
+  margin:10px 10px 0 !important;
+  padding:9px 10px !important;
+}
+#nmda-root.nmda-standalone .nmda-bulk-workbench[data-view-step="3"] .nmda-stage-preflight strong { font-size:10.5px; }
+#nmda-root.nmda-standalone .nmda-bulk-workbench[data-view-step="3"] .nmda-stage-preflight small { font-size:9.5px; line-height:1.45; }
+#nmda-root.nmda-standalone .nmda-bulk-workbench[data-view-step="3"] .nmda-scheduler-grid {
+  grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+  gap:8px !important;
+  margin:10px 10px 0 !important;
+  padding:0 !important;
+}
+#nmda-root.nmda-standalone .nmda-bulk-workbench[data-view-step="3"] .nmda-scheduler-grid > :first-child { grid-column:1 / -1; }
+#nmda-root.nmda-standalone .nmda-bulk-workbench[data-view-step="3"] .nmda-scheduler-grid .nmda-check-card { grid-column:1 / -1; min-height:38px; }
+#nmda-root.nmda-standalone .nmda-bulk-workbench[data-view-step="3"] .nmda-scheduler-grid .nmda-label { font-size:10px; }
+#nmda-root.nmda-standalone .nmda-bulk-workbench[data-view-step="3"] .nmda-scheduler-grid input,
+#nmda-root.nmda-standalone .nmda-bulk-workbench[data-view-step="3"] .nmda-scheduler-grid select { min-height:36px !important; font-size:11px !important; }
+#nmda-root.nmda-standalone .nmda-bulk-workbench[data-view-step="3"] .nmda-scheduler-policy-row {
+  margin:9px 10px 0 !important;
+  padding:9px !important;
+  display:grid !important;
+  gap:7px !important;
+  border:1px solid #e0e7ef;
+  border-radius:9px;
+  background:#fff;
+  font-size:9.5px !important;
+}
+#nmda-root.nmda-standalone .nmda-bulk-workbench[data-view-step="3"] .nmda-scheduler-holiday-toggle {
+  width:100%;
+  align-items:flex-start;
+}
+#nmda-root.nmda-standalone .nmda-bulk-workbench[data-view-step="3"] .nmda-scheduler-holiday-toggle strong { font-size:10px; }
+#nmda-root.nmda-standalone .nmda-bulk-workbench[data-view-step="3"] .nmda-scheduler-holiday-toggle small { font-size:9px; }
+#nmda-root.nmda-standalone .nmda-bulk-workbench[data-view-step="3"] .nmda-scheduler-actions {
+  min-height:0;
+  display:grid !important;
+  grid-template-columns:1fr 1fr !important;
+  gap:7px !important;
+  align-content:end;
+  margin:9px 10px 10px !important;
+}
+#nmda-root.nmda-standalone .nmda-bulk-workbench[data-view-step="3"] .nmda-schedule-rule-preview {
+  grid-column:1 / -1;
+  min-height:42px;
+  padding:8px 9px;
+  font-size:9.5px !important;
+  line-height:1.45;
+}
+#nmda-root.nmda-standalone .nmda-bulk-workbench[data-view-step="3"] .nmda-scheduler-actions .nmda-btn { min-width:0; width:100%; }
+#nmda-root.nmda-standalone .nmda-bulk-workbench[data-view-step="3"] .nmda-batch-table-wrap {
+  grid-column:2;
+  grid-row:3;
+  min-width:0;
+  min-height:0 !important;
+  height:100% !important;
+  overflow:auto !important;
+  scrollbar-gutter:stable;
+  overscroll-behavior:contain;
+}
+
+/* At compact widths preserve the two decisions: rule panel on the left, mail preview on
+   the right. Shrink chrome, not the controls themselves. */
+@media (max-width:980px) {
+  #nmda-root.nmda-standalone .nmda-bulk-workbench[data-view-step="3"] > #nmda-preview-card:not([hidden]) {
+    grid-template-columns:260px minmax(0,1fr) !important;
+    gap:8px !important;
+    padding:10px !important;
+  }
+  #nmda-root.nmda-standalone .nmda-bulk-workbench[data-view-step="3"] #nmda-scheduler-card > summary { min-height:44px; }
+  #nmda-root.nmda-standalone .nmda-bulk-workbench[data-view-step="3"] .nmda-stage-preflight { margin:8px 8px 0 !important; padding:7px 8px !important; }
+  #nmda-root.nmda-standalone .nmda-bulk-workbench[data-view-step="3"] .nmda-scheduler-grid { margin:8px 8px 0 !important; gap:6px !important; }
+  #nmda-root.nmda-standalone .nmda-bulk-workbench[data-view-step="3"] .nmda-scheduler-policy-row { margin:7px 8px 0 !important; padding:7px !important; }
+  #nmda-root.nmda-standalone .nmda-bulk-workbench[data-view-step="3"] .nmda-scheduler-actions { margin:7px 8px 8px !important; gap:6px !important; }
+
+  .nmda-classify-files-view { grid-template-columns:150px minmax(320px,1fr) 290px; }
+  .nmda-classify-support-view .nmda-classify-supplement-stack { grid-template-columns:minmax(240px,.8fr) minmax(330px,1.25fr); }
+}
+
+@media (max-width:820px) {
+  #nmda-root.nmda-standalone .nmda-classify-dialog {
+    width:calc(100vw - 16px) !important;
+    height:calc(100dvh - 16px) !important;
+    max-height:calc(100dvh - 16px) !important;
+  }
+  .nmda-classify-modebar { min-height:46px; padding:5px 8px; }
+  .nmda-classify-modebar button { min-width:0; flex:1; grid-template-columns:22px minmax(0,1fr); min-height:34px; }
+  .nmda-classify-modebar button small { display:none; }
+  .nmda-classify-files-view { grid-template-columns:124px minmax(0,1fr) !important; }
+  .nmda-classify-files-view .nmda-classify-inspector-pane { display:none !important; }
+  .nmda-classify-files-view:has(#nmda-source-inspector-card:not([hidden])) .nmda-classify-main { display:none !important; }
+  .nmda-classify-files-view:has(#nmda-source-inspector-card:not([hidden])) .nmda-classify-inspector-pane {
+    display:grid !important;
+    grid-column:2;
+    border-left:0;
+  }
+  .nmda-classify-support-view .nmda-classify-upload-dock { padding:10px !important; }
+  .nmda-classify-support-view .nmda-classify-supplement-stack {
+    grid-template-columns:minmax(0,.85fr) minmax(0,1.15fr) !important;
+    gap:8px !important;
+  }
+  #nmda-root.nmda-standalone .nmda-classify-support-view .nmda-supplement-box-compact { padding:11px !important; grid-template-columns:34px minmax(0,1fr) !important; gap:7px 8px !important; }
+  #nmda-root.nmda-standalone .nmda-classify-support-view .nmda-supplement-box-icon { width:34px !important; height:34px !important; font-size:11px !important; }
+  #nmda-root.nmda-standalone .nmda-classify-support-view .nmda-supplement-box-main > strong { font-size:11.5px !important; }
+  #nmda-root.nmda-standalone .nmda-classify-support-view .nmda-supplement-box-main > small { font-size:9.5px !important; }
+  .nmda-support-view-head { min-height:48px; padding:7px 11px; }
+  .nmda-support-view-head strong { font-size:12px; }
+  .nmda-support-view-head small { display:none; }
+
+  /* Undo the old “stack the whole planning page and scroll it” fallback. */
+  #nmda-root.nmda-standalone .nmda-bulk-workbench[data-view-step="3"] > #nmda-preview-card:not([hidden]) {
+    grid-template-columns:248px minmax(0,1fr) !important;
+    grid-template-rows:auto auto minmax(0,1fr) !important;
+    overflow:hidden !important;
+    scrollbar-gutter:auto !important;
+  }
+  #nmda-root.nmda-standalone .nmda-bulk-workbench[data-view-step="3"] #nmda-scheduler-card {
+    grid-column:1 !important;
+    grid-row:2 / 4 !important;
+    overflow:hidden !important;
+  }
+  #nmda-root.nmda-standalone .nmda-bulk-workbench[data-view-step="3"] #nmda-scope-tools { grid-column:2 !important; grid-row:2 !important; }
+  #nmda-root.nmda-standalone .nmda-bulk-workbench[data-view-step="3"] .nmda-batch-table-wrap {
+    grid-column:2 !important;
+    grid-row:3 !important;
+    min-height:0 !important;
+    height:100% !important;
+    overflow:auto !important;
+  }
+}
+
+@media (max-height:720px) {
+  #nmda-root.nmda-standalone .nmda-classify-head { min-height:62px; padding:8px 12px !important; }
+  .nmda-classify-modebar { min-height:44px; }
+  #nmda-root.nmda-standalone .nmda-classify-foot { min-height:52px; padding:6px 12px !important; }
+  #nmda-root.nmda-standalone .nmda-bulk-workbench[data-view-step="3"] #nmda-scheduler-card > summary { min-height:40px; padding:6px 8px; }
+  #nmda-root.nmda-standalone .nmda-bulk-workbench[data-view-step="3"] .nmda-stage-preflight { margin-top:6px !important; padding:6px 7px !important; }
+  #nmda-root.nmda-standalone .nmda-bulk-workbench[data-view-step="3"] .nmda-scheduler-grid { margin-top:6px !important; }
+  #nmda-root.nmda-standalone .nmda-bulk-workbench[data-view-step="3"] .nmda-scheduler-policy-row { margin-top:5px !important; padding:6px !important; }
+  #nmda-root.nmda-standalone .nmda-bulk-workbench[data-view-step="3"] .nmda-scheduler-actions { margin-top:5px !important; }
+}
+
+/* Compact planning switches between two full task canvases instead of squeezing
+   schedule controls beside the mail table. Desktop keeps the dual-pane overview. */
+.nmda-planning-modebar { display:none; }
+
+@media (max-width:900px) {
+  #nmda-root.nmda-standalone .nmda-bulk-workbench[data-view-step="3"] > #nmda-preview-card:not([hidden]) {
+    grid-template-columns:minmax(0,1fr) !important;
+    grid-template-rows:auto auto minmax(0,1fr) !important;
+    gap:8px !important;
+  }
+  .nmda-planning-modebar {
+    grid-column:1;
+    grid-row:2;
+    min-height:40px;
+    display:grid;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:6px;
+    padding:4px;
+    border:1px solid var(--nmda-border);
+    border-radius:9px;
+    background:#f7f9fc;
+  }
+  .nmda-planning-modebar button {
+    min-height:32px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:7px;
+    border:0;
+    border-radius:7px;
+    background:transparent;
+    color:#667085;
+    font:700 10.5px/1 var(--nmda-font);
+    cursor:pointer;
+  }
+  .nmda-planning-modebar button span { color:#7f8a9a; font-size:12px; }
+  .nmda-planning-modebar button.is-active { background:#fff; color:#155bc2; box-shadow:0 1px 3px rgba(16,24,40,.08); }
+  .nmda-planning-modebar button.is-active span { color:var(--nmda-blue); }
+
+  #nmda-root.nmda-standalone #nmda-preview-card[data-planning-view="rules"] #nmda-scheduler-card {
+    display:grid !important;
+    grid-column:1 !important;
+    grid-row:3 !important;
+    width:100%;
+    height:100%;
+  }
+  #nmda-root.nmda-standalone #nmda-preview-card[data-planning-view="rules"] #nmda-scope-tools,
+  #nmda-root.nmda-standalone #nmda-preview-card[data-planning-view="rules"] .nmda-batch-table-wrap {
+    display:none !important;
+  }
+  #nmda-root.nmda-standalone #nmda-preview-card[data-planning-view="mails"] #nmda-scheduler-card {
+    display:none !important;
+  }
+  #nmda-root.nmda-standalone #nmda-preview-card[data-planning-view="mails"] #nmda-scope-tools {
+    display:block !important;
+    grid-column:1 !important;
+    grid-row:3 !important;
+    align-self:start;
+  }
+  #nmda-root.nmda-standalone #nmda-preview-card[data-planning-view="mails"] .nmda-batch-table-wrap {
+    display:block !important;
+    grid-column:1 !important;
+    grid-row:3 !important;
+    height:calc(100% - 50px) !important;
+    margin-top:50px;
+  }
+  #nmda-root.nmda-standalone #nmda-preview-card[data-planning-view="rules"] .nmda-scheduler-grid {
+    grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+  }
+  #nmda-root.nmda-standalone #nmda-preview-card[data-planning-view="rules"] .nmda-scheduler-actions {
+    grid-template-columns:minmax(0,1fr) auto auto !important;
+    align-items:end;
+  }
+  #nmda-root.nmda-standalone #nmda-preview-card[data-planning-view="rules"] .nmda-schedule-rule-preview {
+    grid-column:1;
+    min-height:36px;
+  }
+}
+
+/* Reset legacy absolute-position inspector behavior in compact drill-in mode. */
+@media (max-width:820px) {
+  #nmda-root.nmda-standalone .nmda-classify-files-view:has(#nmda-source-inspector-card:not([hidden])) .nmda-classify-inspector-pane {
+    position:static !important;
+    inset:auto !important;
+    top:auto !important;
+    right:auto !important;
+    bottom:auto !important;
+    left:auto !important;
+    width:auto !important;
+    max-width:none !important;
+    height:auto !important;
+    max-height:none !important;
+    margin:0 !important;
+    border-radius:0 !important;
+    box-shadow:none !important;
+  }
+}
+
+/* Stage isolation must outrank the import-canvas layout contract. */
+#nmda-root.nmda-standalone .nmda-bulk-workbench[data-view-step="3"] > .nmda-ingest-workspace-v2,
+#nmda-root.nmda-standalone .nmda-bulk-workbench[data-view-step="4"] > .nmda-ingest-workspace-v2 {
+  display:none !important;
+}
+
+/* ========================================================================== 
+   v2.2 final pass — one decision per canvas
+   ========================================================================== */
+
+/* Batch materials: roster and attachments no longer compete for width. */
+.nmda-support-view-head {
+  display:grid !important;
+  grid-template-columns:minmax(0,1fr) minmax(260px,380px);
+  align-items:center;
+  gap:14px;
+}
+.nmda-support-modebar {
+  min-width:0;
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:5px;
+  padding:4px;
+  border:1px solid var(--nmda-border);
+  border-radius:9px;
+  background:#f5f7fa;
+}
+.nmda-support-modebar button {
+  min-width:0;
+  min-height:34px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:7px;
+  padding:0 10px;
+  border:0;
+  border-radius:7px;
+  background:transparent;
+  color:#667085;
+  font:700 11px/1 var(--nmda-font);
+  cursor:pointer;
+}
+.nmda-support-modebar button > span {
+  width:20px;
+  height:20px;
+  display:grid;
+  place-items:center;
+  border-radius:6px;
+  background:#e9eef5;
+  color:#667085;
+  font-size:9px;
+}
+.nmda-support-modebar button.is-active {
+  background:#fff;
+  color:#155bc2;
+  box-shadow:0 1px 3px rgba(16,24,40,.09);
+}
+.nmda-support-modebar button.is-active > span { background:#e8f2ff; color:#1769d8; }
+#nmda-root.nmda-standalone .nmda-classify-support-view .nmda-classify-upload-dock {
+  display:grid !important;
+  place-items:stretch center;
+}
+.nmda-classify-support-view .nmda-classify-supplement-stack {
+  width:100%;
+  height:100%;
+  min-height:0;
+  display:block !important;
+  padding:0 !important;
+}
+#nmda-root.nmda-standalone .nmda-classify-support-view [data-support-pane] {
+  width:100%;
+  height:100%;
+  max-width:none;
+}
+#nmda-root.nmda-standalone .nmda-classify-support-view [data-support-pane][hidden] { display:none !important; }
+#nmda-root.nmda-standalone .nmda-classify-support-view[data-support-view="roster"] #nmda-preflight-roster-box {
+  width:min(720px,100%);
+  height:auto;
+  min-height:220px;
+  margin:clamp(10px,4vh,38px) auto 0;
+  grid-template-columns:52px minmax(0,1fr) auto !important;
+  grid-template-rows:auto auto !important;
+  align-content:start;
+  padding:22px !important;
+}
+#nmda-root.nmda-standalone .nmda-classify-support-view[data-support-view="roster"] #nmda-preflight-roster-box .nmda-supplement-actions {
+  grid-column:3 !important;
+  grid-row:1;
+  align-self:start;
+}
+#nmda-root.nmda-standalone .nmda-classify-support-view[data-support-view="attachment"] #nmda-preflight-attachment-box {
+  grid-template-columns:52px minmax(0,1fr) auto !important;
+  grid-template-rows:minmax(0,1fr) auto !important;
+  padding:20px !important;
+}
+#nmda-root.nmda-standalone .nmda-classify-support-view[data-support-view="attachment"] #nmda-preflight-attachment-box .nmda-supplement-actions {
+  grid-column:3 !important;
+  grid-row:1;
+  align-self:start;
+  justify-self:end;
+}
+#nmda-root.nmda-standalone .nmda-classify-support-view[data-support-view="attachment"] #nmda-preflight-attachment-box .nmda-supplement-box-main {
+  height:100%;
+  grid-template-rows:auto auto auto minmax(0,1fr);
+}
+
+/* Planning: rule editing and mail-time review are full canvases at every width. */
+#nmda-root.nmda-standalone .nmda-bulk-workbench[data-view-step="3"] > #nmda-preview-card:not([hidden]) {
+  grid-template-columns:minmax(0,1fr) !important;
+  grid-template-rows:auto auto minmax(0,1fr) !important;
+  gap:10px !important;
+  padding:14px !important;
+}
+#nmda-root.nmda-standalone .nmda-bulk-workbench[data-view-step="3"] #nmda-preview-card > .nmda-card-head {
+  grid-column:1 !important;
+  grid-row:1 !important;
+}
+.nmda-planning-modebar {
+  grid-column:1 !important;
+  grid-row:2 !important;
+  width:min(560px,100%);
+  min-height:42px;
+  display:grid !important;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:5px;
+  padding:4px;
+  border:1px solid var(--nmda-border);
+  border-radius:9px;
+  background:#f5f7fa;
+}
+.nmda-planning-modebar button {
+  min-width:0;
+  min-height:32px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:7px;
+  border:0;
+  border-radius:7px;
+  background:transparent;
+  color:#667085;
+  font:700 11px/1 var(--nmda-font);
+  cursor:pointer;
+}
+.nmda-planning-modebar button.is-active { background:#fff; color:#155bc2; box-shadow:0 1px 3px rgba(16,24,40,.08); }
+#nmda-root.nmda-standalone #nmda-preview-card[data-planning-view="rules"] #nmda-scheduler-card {
+  display:grid !important;
+  grid-column:1 !important;
+  grid-row:3 !important;
+  justify-self:stretch;
+  width:100% !important;
+  height:100% !important;
+  min-height:0 !important;
+  grid-template-rows:minmax(0,1fr) auto auto !important;
+  align-content:stretch !important;
+  overflow:hidden !important;
+  border:1px solid #d7e3f4 !important;
+  border-radius:11px !important;
+  background:#fbfdff !important;
+}
+#nmda-root.nmda-standalone #nmda-preview-card[data-planning-view="rules"] #nmda-scheduler-card > summary,
+#nmda-root.nmda-standalone #nmda-preview-card[data-planning-view="rules"] .nmda-stage-preflight { display:none !important; }
+#nmda-root.nmda-standalone #nmda-preview-card[data-planning-view="rules"] .nmda-scheduler-grid {
+  align-self:center;
+  width:min(1050px,calc(100% - 32px));
+  margin:0 auto !important;
+  padding:16px 0 !important;
+  display:grid !important;
+  grid-template-columns:minmax(240px,1.5fr) minmax(150px,.8fr) minmax(150px,.8fr) minmax(190px,1fr) !important;
+  gap:12px !important;
+}
+#nmda-root.nmda-standalone #nmda-preview-card[data-planning-view="rules"] .nmda-scheduler-grid > :first-child,
+#nmda-root.nmda-standalone #nmda-preview-card[data-planning-view="rules"] .nmda-scheduler-grid .nmda-check-card { grid-column:auto !important; }
+#nmda-root.nmda-standalone #nmda-preview-card[data-planning-view="rules"] .nmda-scheduler-grid .nmda-field,
+#nmda-root.nmda-standalone #nmda-preview-card[data-planning-view="rules"] .nmda-scheduler-grid .nmda-check-card {
+  min-height:74px;
+  padding:10px 11px;
+  border:1px solid #e1e8f0;
+  border-radius:9px;
+  background:#fff;
+}
+#nmda-root.nmda-standalone #nmda-preview-card[data-planning-view="rules"] .nmda-scheduler-policy-row {
+  width:min(1050px,calc(100% - 32px));
+  min-height:50px;
+  margin:0 auto 10px !important;
+  padding:8px 10px !important;
+  display:flex !important;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px !important;
+  border:1px solid #e1e8f0;
+  border-radius:9px;
+  background:#fff;
+}
+#nmda-root.nmda-standalone #nmda-preview-card[data-planning-view="rules"] .nmda-scheduler-policy-row > span { font-size:10.5px; color:#667085; }
+#nmda-root.nmda-standalone #nmda-preview-card[data-planning-view="rules"] .nmda-scheduler-actions {
+  min-height:58px;
+  margin:0 !important;
+  padding:9px 12px !important;
+  display:grid !important;
+  grid-template-columns:minmax(0,1fr) auto auto !important;
+  align-items:center !important;
+  gap:8px !important;
+  border-top:1px solid #e1e8f0;
+  background:#fff;
+}
+#nmda-root.nmda-standalone #nmda-preview-card[data-planning-view="rules"] .nmda-schedule-rule-preview {
+  grid-column:1 !important;
+  min-height:0 !important;
+  padding:0 !important;
+  border:0 !important;
+  background:transparent !important;
+  font-size:10.5px !important;
+}
+#nmda-root.nmda-standalone #nmda-preview-card[data-planning-view="rules"] #nmda-scope-tools,
+#nmda-root.nmda-standalone #nmda-preview-card[data-planning-view="rules"] .nmda-batch-table-wrap { display:none !important; }
+#nmda-root.nmda-standalone #nmda-preview-card[data-planning-view="mails"] #nmda-scheduler-card { display:none !important; }
+#nmda-root.nmda-standalone #nmda-preview-card[data-planning-view="mails"] {
+  grid-template-rows:auto auto auto minmax(0,1fr) !important;
+}
+#nmda-root.nmda-standalone #nmda-preview-card[data-planning-view="mails"] #nmda-scope-tools {
+  display:block !important;
+  grid-column:1 !important;
+  grid-row:3 !important;
+  margin:0 !important;
+}
+#nmda-root.nmda-standalone #nmda-preview-card[data-planning-view="mails"] .nmda-batch-table-wrap {
+  display:block !important;
+  grid-column:1 !important;
+  grid-row:4 !important;
+  width:100% !important;
+  height:100% !important;
+  min-height:0 !important;
+  margin:0 !important;
+  overflow:auto !important;
+}
+
+@media (max-width:900px) {
+  .nmda-support-view-head { grid-template-columns:minmax(0,1fr) minmax(220px,320px); padding:7px 10px !important; }
+  .nmda-support-view-head > div strong { font-size:11.5px; }
+  .nmda-support-view-head > div span { font-size:9px; }
+  #nmda-root.nmda-standalone .nmda-classify-support-view[data-support-view="roster"] #nmda-preflight-roster-box {
+    width:100%;
+    min-height:0;
+    height:100%;
+    margin:0;
+    grid-template-columns:40px minmax(0,1fr) !important;
+    grid-template-rows:minmax(0,1fr) auto !important;
+    padding:14px !important;
+  }
+  #nmda-root.nmda-standalone .nmda-classify-support-view[data-support-view="roster"] #nmda-preflight-roster-box .nmda-supplement-actions {
+    grid-column:1 / -1 !important;
+    grid-row:2;
+  }
+  #nmda-root.nmda-standalone .nmda-classify-support-view[data-support-view="attachment"] #nmda-preflight-attachment-box {
+    grid-template-columns:40px minmax(0,1fr) !important;
+    grid-template-rows:minmax(0,1fr) auto !important;
+    padding:14px !important;
+  }
+  #nmda-root.nmda-standalone .nmda-classify-support-view[data-support-view="attachment"] #nmda-preflight-attachment-box .nmda-supplement-actions {
+    grid-column:1 / -1 !important;
+    grid-row:2;
+    justify-self:start;
+  }
+  #nmda-root.nmda-standalone #nmda-preview-card[data-planning-view="rules"] .nmda-scheduler-grid {
+    width:calc(100% - 20px);
+    grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+    gap:8px !important;
+    padding:10px 0 !important;
+  }
+  #nmda-root.nmda-standalone #nmda-preview-card[data-planning-view="rules"] .nmda-scheduler-grid .nmda-field,
+  #nmda-root.nmda-standalone #nmda-preview-card[data-planning-view="rules"] .nmda-scheduler-grid .nmda-check-card { min-height:58px; padding:7px 8px; }
+  #nmda-root.nmda-standalone #nmda-preview-card[data-planning-view="rules"] .nmda-scheduler-policy-row {
+    width:calc(100% - 20px);
+    min-height:44px;
+    margin-bottom:7px !important;
+  }
+  #nmda-root.nmda-standalone #nmda-preview-card[data-planning-view="rules"] .nmda-scheduler-actions { min-height:52px; padding:7px 9px !important; }
+}
+
+@media (max-width:720px) {
+  .nmda-support-view-head { grid-template-columns:1fr; gap:5px; }
+  .nmda-support-view-head > div { display:none; }
+  .nmda-support-modebar { width:100%; }
+  #nmda-root.nmda-standalone #nmda-preview-card[data-planning-view="rules"] .nmda-scheduler-grid { grid-template-columns:1fr 1fr !important; }
+}
+
+/* Stage contents are mutually exclusive. Rendering data must never resurrect another stage. */
+#nmda-root.nmda-standalone .nmda-bulk-workbench[data-view-step="1"] .nmda-ingest-workspace-v2 {
+  display:grid !important;
+  grid-template-columns:minmax(0,1fr) !important;
+  grid-template-rows:minmax(0,1fr) !important;
+  overflow:hidden !important;
+}
+#nmda-root.nmda-standalone .nmda-bulk-workbench[data-view-step="1"] #nmda-import-card:not([hidden]) {
+  display:grid !important;
+}
+#nmda-root.nmda-standalone .nmda-bulk-workbench[data-view-step="1"] #nmda-ingest-result-card,
+#nmda-root.nmda-standalone .nmda-bulk-workbench[data-view-step="1"] #nmda-inline-review,
+#nmda-root.nmda-standalone .nmda-bulk-workbench[data-view-step="1"] #nmda-roster-audit-card { display:none !important; }
+
+#nmda-root.nmda-standalone .nmda-bulk-workbench[data-view-step="2"] .nmda-ingest-workspace-v2 {
+  display:grid !important;
+  grid-template-columns:minmax(0,1fr) !important;
+  grid-template-rows:minmax(0,1fr) auto !important;
+  gap:10px !important;
+  overflow:hidden !important;
+}
+#nmda-root.nmda-standalone .nmda-bulk-workbench[data-view-step="2"] #nmda-import-card { display:none !important; }
+#nmda-root.nmda-standalone .nmda-bulk-workbench[data-view-step="2"] #nmda-ingest-result-card:not([hidden]) {
+  grid-row:1;
+  min-height:0;
+  overflow-y:auto !important;
+  overscroll-behavior:contain;
+}
+#nmda-root.nmda-standalone .nmda-bulk-workbench[data-view-step="2"] #nmda-roster-audit-card:not([hidden]) {
+  grid-row:2;
+  max-height:190px;
+  overflow:hidden !important;
+}
+#nmda-root.nmda-standalone .nmda-bulk-workbench[data-view-step="2"] .nmda-ingest-workspace-v2:has(#nmda-inline-review:not([hidden])) {
+  grid-template-rows:minmax(0,1fr) !important;
+}
+#nmda-root.nmda-standalone .nmda-bulk-workbench[data-view-step="2"] .nmda-ingest-workspace-v2:has(#nmda-inline-review:not([hidden])) #nmda-ingest-result-card,
+#nmda-root.nmda-standalone .nmda-bulk-workbench[data-view-step="2"] .nmda-ingest-workspace-v2:has(#nmda-inline-review:not([hidden])) #nmda-roster-audit-card { display:none !important; }
+#nmda-root.nmda-standalone .nmda-bulk-workbench[data-view-step="2"] #nmda-inline-review:not([hidden]) {
+  display:block !important;
+  grid-row:1;
+  height:100% !important;
+  min-height:0 !important;
+}
+
+/* A simple roster task should stay compact; attachment management receives the large canvas. */
+#nmda-root.nmda-standalone .nmda-classify-support-view[data-support-view="roster"] #nmda-preflight-roster-box {
+  min-height:150px;
+  max-height:190px;
+}
+@media (max-width:900px) {
+  #nmda-root.nmda-standalone .nmda-classify-support-view[data-support-view="roster"] #nmda-preflight-roster-box {
+    max-height:none;
+  }
+}
+
+/* ========================================================================== 
+   v2.3 adaptive viewport contract
+   The shell consumes as little fixed space as possible. Each batch step is a
+   bounded canvas; only the content collection inside that canvas may scroll.
+   ========================================================================== */
+#nmda-root.nmda-standalone #nmda-panel {
+  grid-template-columns:70px minmax(0,1fr) !important;
+  grid-template-rows:52px minmax(0,1fr) !important;
+}
+#nmda-root.nmda-standalone .nmda-head { padding:0 12px !important; }
+#nmda-root.nmda-standalone .nmda-safe-badge { display:none !important; }
+#nmda-root.nmda-standalone .nmda-mail-connection { min-width:220px; min-height:34px; }
+#nmda-root.nmda-standalone .nmda-mail-connection-copy small { display:none !important; }
+#nmda-root.nmda-standalone .nmda-tabs { padding:9px 6px !important; }
+#nmda-root.nmda-standalone .nmda-nav-label { display:none !important; }
+#nmda-root.nmda-standalone .nmda-tab {
+  min-height:58px !important;
+  grid-template-columns:1fr !important;
+  grid-template-rows:30px auto !important;
+  justify-items:center !important;
+  align-content:center !important;
+  gap:4px !important;
+  padding:6px 3px !important;
+  text-align:center !important;
+}
+#nmda-root.nmda-standalone .nmda-tab-icon { width:30px; height:30px; }
+#nmda-root.nmda-standalone .nmda-tab small { display:none !important; }
+#nmda-root.nmda-standalone .nmda-tab strong { font-size:10.5px !important; white-space:nowrap !important; }
+#nmda-root.nmda-standalone .nmda-main { grid-template-rows:minmax(0,1fr) !important; }
+#nmda-root.nmda-standalone .nmda-page-head { display:none !important; }
+#nmda-root.nmda-standalone .nmda-page { grid-row:1 !important; padding:10px 12px !important; overflow:hidden !important; }
+
+/* Compact process navigation: progress remains visible without becoming a header. */
+#nmda-root.nmda-standalone .nmda-bulk-workbench {
+  grid-template-rows:42px minmax(0,1fr) !important;
+  gap:8px !important;
+  padding:10px 12px !important;
+}
+#nmda-root.nmda-standalone .nmda-process-guide {
+  grid-template-columns:72px repeat(4,minmax(0,1fr)) !important;
+  min-height:42px !important;
+  gap:4px !important;
+  padding:4px !important;
+}
+#nmda-root.nmda-standalone .nmda-process-guide-title { padding:0 6px !important; }
+#nmda-root.nmda-standalone .nmda-process-guide-title small,
+#nmda-root.nmda-standalone .nmda-process-guide > button[data-flow-step] small { display:none !important; }
+#nmda-root.nmda-standalone .nmda-process-guide > button[data-flow-step] {
+  min-height:32px !important;
+  grid-template-columns:24px minmax(0,1fr) !important;
+  grid-template-rows:1fr !important;
+  column-gap:6px !important;
+  padding:3px 7px !important;
+}
+#nmda-root.nmda-standalone .nmda-process-guide > button[data-flow-step] > span {
+  grid-row:1 !important;
+  width:24px !important;
+  height:24px !important;
+}
+#nmda-root.nmda-standalone .nmda-process-guide > button[data-flow-step] strong {
+  font-size:10.5px !important;
+  overflow:hidden !important;
+  text-overflow:ellipsis !important;
+}
+
+/* Stage 3 is always two subviews. Never put the rule editor beside the mail list. */
+#nmda-root.nmda-standalone .nmda-bulk-workbench[data-view-step="3"] > #nmda-preview-card:not([hidden]) {
+  grid-template-columns:minmax(0,1fr) !important;
+  grid-template-rows:34px 38px minmax(0,1fr) !important;
+  gap:7px !important;
+  padding:10px !important;
+  overflow:hidden !important;
+}
+#nmda-root.nmda-standalone .nmda-bulk-workbench[data-view-step="3"] #nmda-preview-card > .nmda-card-head {
+  grid-column:1 !important;
+  grid-row:1 !important;
+  min-height:34px !important;
+  align-items:center !important;
+}
+#nmda-root.nmda-standalone .nmda-bulk-workbench[data-view-step="3"] #nmda-preview-card .nmda-card-title { font-size:14px !important; }
+#nmda-root.nmda-standalone .nmda-bulk-workbench[data-view-step="3"] #nmda-preview-card .nmda-summary-inline {
+  padding:5px 9px !important;
+  border-radius:8px !important;
+  font-size:10.5px !important;
+  white-space:nowrap;
+}
+#nmda-root.nmda-standalone .nmda-planning-modebar {
+  grid-column:1 !important;
+  grid-row:2 !important;
+  width:100% !important;
+  min-height:38px !important;
+  display:grid !important;
+  grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+  gap:4px !important;
+  padding:3px !important;
+}
+#nmda-root.nmda-standalone .nmda-planning-modebar button { min-height:30px !important; font-size:10.5px !important; }
+
+/* Rule canvas owns vertical overflow only when the viewport is unusually short. */
+#nmda-root.nmda-standalone #nmda-preview-card[data-planning-view="rules"] #nmda-scheduler-card {
+  display:grid !important;
+  grid-column:1 !important;
+  grid-row:3 !important;
+  grid-template-rows:auto auto auto !important;
+  align-content:start !important;
+  width:100% !important;
+  height:100% !important;
+  min-height:0 !important;
+  margin:0 !important;
+  overflow-y:auto !important;
+  overflow-x:hidden !important;
+  scrollbar-gutter:stable;
+  overscroll-behavior:contain;
+  border:1px solid #d7e3f4 !important;
+  border-radius:10px !important;
+  background:#fbfdff !important;
+}
+#nmda-root.nmda-standalone #nmda-preview-card[data-planning-view="rules"] #nmda-scheduler-card > summary,
+#nmda-root.nmda-standalone #nmda-preview-card[data-planning-view="rules"] .nmda-stage-preflight { display:none !important; }
+#nmda-root.nmda-standalone #nmda-preview-card[data-planning-view="rules"] .nmda-scheduler-grid {
+  width:100% !important;
+  margin:0 !important;
+  padding:12px !important;
+  display:grid !important;
+  grid-template-columns:minmax(230px,1.45fr) minmax(145px,.8fr) minmax(145px,.8fr) minmax(170px,.9fr) !important;
+  gap:9px !important;
+  align-items:stretch !important;
+}
+#nmda-root.nmda-standalone #nmda-preview-card[data-planning-view="rules"] .nmda-scheduler-grid > :first-child,
+#nmda-root.nmda-standalone #nmda-preview-card[data-planning-view="rules"] .nmda-scheduler-grid .nmda-check-card { grid-column:auto !important; }
+#nmda-root.nmda-standalone #nmda-preview-card[data-planning-view="rules"] .nmda-scheduler-grid .nmda-field,
+#nmda-root.nmda-standalone #nmda-preview-card[data-planning-view="rules"] .nmda-scheduler-grid .nmda-check-card {
+  min-width:0;
+  min-height:66px !important;
+  margin:0 !important;
+  padding:8px 10px !important;
+  border:1px solid #e1e8f0 !important;
+  border-radius:9px !important;
+  background:#fff !important;
+}
+#nmda-root.nmda-standalone #nmda-preview-card[data-planning-view="rules"] .nmda-scheduler-grid input,
+#nmda-root.nmda-standalone #nmda-preview-card[data-planning-view="rules"] .nmda-scheduler-grid select {
+  min-height:36px !important;
+  height:36px !important;
+  font-size:11.5px !important;
+}
+#nmda-root.nmda-standalone #nmda-preview-card[data-planning-view="rules"] .nmda-scheduler-policy-row {
+  width:auto !important;
+  min-height:42px !important;
+  margin:0 12px 9px !important;
+  padding:7px 10px !important;
+  display:flex !important;
+  align-items:center !important;
+  justify-content:flex-start !important;
+  border:1px solid #e1e8f0 !important;
+  border-radius:9px !important;
+  background:#fff !important;
+}
+#nmda-root.nmda-standalone #nmda-preview-card[data-planning-view="rules"] .nmda-scheduler-policy-row > span { display:none !important; }
+#nmda-root.nmda-standalone #nmda-preview-card[data-planning-view="rules"] .nmda-scheduler-holiday-toggle { width:auto !important; align-items:center !important; }
+#nmda-root.nmda-standalone #nmda-preview-card[data-planning-view="rules"] .nmda-scheduler-holiday-toggle small { display:none !important; }
+#nmda-root.nmda-standalone #nmda-preview-card[data-planning-view="rules"] .nmda-scheduler-actions {
+  position:sticky;
+  bottom:0;
+  z-index:2;
+  min-height:52px !important;
+  margin:0 !important;
+  padding:7px 10px !important;
+  display:grid !important;
+  grid-template-columns:minmax(0,1fr) auto auto !important;
+  align-items:center !important;
+  gap:7px !important;
+  border-top:1px solid #e1e8f0 !important;
+  background:rgba(255,255,255,.98) !important;
+}
+#nmda-root.nmda-standalone #nmda-preview-card[data-planning-view="rules"] .nmda-schedule-rule-preview {
+  grid-column:1 !important;
+  min-height:0 !important;
+  padding:0 !important;
+  border:0 !important;
+  background:transparent !important;
+  font-size:10.5px !important;
+  line-height:1.35 !important;
+}
+#nmda-root.nmda-standalone #nmda-preview-card[data-planning-view="rules"] #nmda-scope-tools,
+#nmda-root.nmda-standalone #nmda-preview-card[data-planning-view="rules"] .nmda-batch-table-wrap { display:none !important; }
+
+/* Mail-time canvas: filters remain compact; the table alone owns the long list. */
+#nmda-root.nmda-standalone #nmda-preview-card[data-planning-view="mails"] {
+  grid-template-rows:34px 38px auto minmax(0,1fr) !important;
+}
+#nmda-root.nmda-standalone #nmda-preview-card[data-planning-view="mails"] #nmda-scheduler-card { display:none !important; }
+#nmda-root.nmda-standalone #nmda-preview-card[data-planning-view="mails"] #nmda-scope-tools {
+  display:block !important;
+  grid-column:1 !important;
+  grid-row:3 !important;
+  margin:0 !important;
+}
+#nmda-root.nmda-standalone #nmda-preview-card[data-planning-view="mails"] #nmda-scope-tools > summary { min-height:34px !important; padding:5px 8px !important; }
+#nmda-root.nmda-standalone #nmda-preview-card[data-planning-view="mails"] .nmda-batch-table-wrap {
+  display:block !important;
+  grid-column:1 !important;
+  grid-row:4 !important;
+  width:100% !important;
+  height:100% !important;
+  min-height:0 !important;
+  margin:0 !important;
+  overflow:auto !important;
+  overscroll-behavior:contain;
+}
+
+@media (max-width:900px) {
+  #nmda-root.nmda-standalone #nmda-panel { grid-template-columns:64px minmax(0,1fr) !important; }
+  #nmda-root.nmda-standalone .nmda-title { font-size:13px; }
+  #nmda-root.nmda-standalone .nmda-mail-connection { min-width:0; grid-template-columns:10px auto !important; }
+  #nmda-root.nmda-standalone .nmda-mail-connection-copy { display:none !important; }
+  #nmda-root.nmda-standalone .nmda-process-guide { grid-template-columns:repeat(4,minmax(0,1fr)) !important; }
+  #nmda-root.nmda-standalone .nmda-process-guide-title { display:none !important; }
+  #nmda-root.nmda-standalone #nmda-preview-card[data-planning-view="rules"] .nmda-scheduler-grid {
+    grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+    padding:9px !important;
+    gap:7px !important;
+  }
+  #nmda-root.nmda-standalone #nmda-preview-card[data-planning-view="rules"] .nmda-scheduler-grid .nmda-field,
+  #nmda-root.nmda-standalone #nmda-preview-card[data-planning-view="rules"] .nmda-scheduler-grid .nmda-check-card { min-height:58px !important; padding:7px 8px !important; }
+  #nmda-root.nmda-standalone #nmda-preview-card[data-planning-view="rules"] .nmda-scheduler-policy-row { margin:0 9px 7px !important; }
+  #nmda-root.nmda-standalone #nmda-preview-card[data-planning-view="rules"] .nmda-scheduler-actions { min-height:48px !important; padding:6px 8px !important; }
+}
+
+@media (max-width:720px) {
+  #nmda-root.nmda-standalone #nmda-panel { grid-template-columns:58px minmax(0,1fr) !important; }
+  #nmda-root.nmda-standalone .nmda-brand-mark { width:28px; height:28px; }
+  #nmda-root.nmda-standalone .nmda-title { display:none; }
+  #nmda-root.nmda-standalone .nmda-tab strong { font-size:9.5px !important; }
+  #nmda-root.nmda-standalone .nmda-process-guide > button[data-flow-step] { grid-template-columns:22px minmax(0,1fr) !important; padding:3px 4px !important; }
+  #nmda-root.nmda-standalone .nmda-process-guide > button[data-flow-step] > span { width:22px !important; height:22px !important; }
+  #nmda-root.nmda-standalone .nmda-process-guide > button[data-flow-step] strong { font-size:9.5px !important; }
+}
+
+/* Height is a first-class responsive axis. Reduce chrome first, never crop content. */
+@media (max-height:680px) {
+  #nmda-root.nmda-standalone #nmda-panel { grid-template-rows:48px minmax(0,1fr) !important; }
+  #nmda-root.nmda-standalone .nmda-brand-mark { width:28px; height:28px; }
+  #nmda-root.nmda-standalone .nmda-bulk-workbench { grid-template-rows:38px minmax(0,1fr) !important; gap:6px !important; padding:8px 10px !important; }
+  #nmda-root.nmda-standalone .nmda-process-guide { min-height:38px !important; }
+  #nmda-root.nmda-standalone .nmda-process-guide > button[data-flow-step] { min-height:28px !important; }
+  #nmda-root.nmda-standalone .nmda-bulk-workbench[data-view-step="3"] > #nmda-preview-card:not([hidden]) {
+    grid-template-rows:30px 34px minmax(0,1fr) !important;
+    gap:5px !important;
+    padding:8px !important;
+  }
+  #nmda-root.nmda-standalone .nmda-bulk-workbench[data-view-step="3"] #nmda-preview-card > .nmda-card-head { min-height:30px !important; }
+  #nmda-root.nmda-standalone .nmda-planning-modebar { min-height:34px !important; }
+  #nmda-root.nmda-standalone .nmda-planning-modebar button { min-height:28px !important; }
+  #nmda-root.nmda-standalone #nmda-preview-card[data-planning-view="rules"] .nmda-scheduler-grid { padding:8px !important; gap:6px !important; }
+  #nmda-root.nmda-standalone #nmda-preview-card[data-planning-view="rules"] .nmda-scheduler-grid .nmda-field,
+  #nmda-root.nmda-standalone #nmda-preview-card[data-planning-view="rules"] .nmda-scheduler-grid .nmda-check-card { min-height:54px !important; padding:6px 8px !important; }
+  #nmda-root.nmda-standalone #nmda-preview-card[data-planning-view="rules"] .nmda-scheduler-grid input,
+  #nmda-root.nmda-standalone #nmda-preview-card[data-planning-view="rules"] .nmda-scheduler-grid select { min-height:32px !important; height:32px !important; }
+  #nmda-root.nmda-standalone #nmda-preview-card[data-planning-view="rules"] .nmda-scheduler-policy-row { min-height:36px !important; margin:0 8px 6px !important; padding:5px 8px !important; }
+  #nmda-root.nmda-standalone #nmda-preview-card[data-planning-view="rules"] .nmda-scheduler-actions { min-height:44px !important; padding:5px 7px !important; }
+}
+
+/* Keep short labels visible even in narrow mode; compression removes descriptions, not orientation. */
+@media (max-width:900px) {
+  #nmda-root.nmda-standalone .nmda-tab > span:not(.nmda-tab-icon) { display:block !important; }
+  #nmda-root.nmda-standalone .nmda-tab strong { display:block !important; }
+  #nmda-root.nmda-standalone .nmda-process-guide > button[data-flow-step] strong { display:block !important; }
+}
+
+/* Mail filters consume only their content height; free space belongs to the mail table. */
+#nmda-root.nmda-standalone #nmda-preview-card[data-planning-view="mails"] {
+  grid-template-rows:34px 38px max-content minmax(0,1fr) !important;
+}
+#nmda-root.nmda-standalone #nmda-preview-card[data-planning-view="mails"] #nmda-scope-tools {
+  align-self:start !important;
+  height:auto !important;
+}
+#nmda-root.nmda-standalone #nmda-preview-card[data-planning-view="mails"] .nmda-batch-table-wrap {
+  align-self:stretch !important;
+  justify-self:stretch !important;
+}
+#nmda-root.nmda-standalone #nmda-preview-card[data-planning-view="mails"] .nmda-batch-table-wrap {
+  align-self:start !important;
+  height:auto !important;
+  max-height:100% !important;
+  overflow:auto !important;
+}
+@media (max-height:680px) {
+  #nmda-root.nmda-standalone .nmda-bulk-workbench[data-view-step="3"] > #nmda-preview-card[data-planning-view="mails"]:not([hidden]) {
+    grid-template-rows:30px 34px max-content minmax(0,1fr) !important;
+  }
+}

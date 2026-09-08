@@ -1,0 +1,32 @@
+{
+  "manifest_version": 3,
+  "name": "NetEase Mail Draft Assistant",
+  "version": "3.7.0",
+  "description": "网易邮箱外联工作台：批量草稿、排期、联系人历史与人工 Follow-up；读取并区分真人回复/Auto Reply，支持网易原生 Fw/Re 与完整性核验。",
+  "permissions": [
+    "storage",
+    "scripting",
+    "tabs"
+  ],
+  "host_permissions": [
+    "https://mail.163.com/*"
+  ],
+  "action": {
+    "default_title": "打开网易邮箱外联工作台"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://mail.163.com/*"
+      ],
+      "js": [
+        "executor.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAtsSYHVZA1TDQv6x0ngH80Zw/eCkGDeV2OBgjABB4pUNc57YjBObeq/PJitSyaAppsUvA7uutDxpaFfsUoyDgafwqVir2YOKi3fNjcs50JAjOkyUX42YHurq0Y5z11xKCdzyUptSSby1OzmXwYbOl1i+OgFNbcz/J5ly2iKiW9PGihAd1eTRRy8NSWExoOvKPHEAAE3rr1gGSokG/tSEXIX24bna8j2RiRC6cgffnwZPoXZf944uKaFh0zDNTonH7KDaPOd6ZtxDKzGcRdHobF01OJ4gHaCOFgytyd0Oq8kP1dZdZttramZrwU4Am/sfykhBMNWOcsodFD/WqUi0ndQIDAQAB"
+}
