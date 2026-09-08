@@ -136,13 +136,16 @@ const server = http.createServer(async (req, res) => {
   catch (_) { return send(res, 400, 'Bad Request'); }
 
   if (pathname === '/health') {
+    const cloudState = cloudDebug.getState();
     return sendJson(res, 200, {
       ok: true,
       app: 'netease-mail-draft-assistant',
       cloudDebug: {
         enabled: Boolean(process.env.DEBUG_TOKEN),
-        phase: cloudDebug.getState().phase,
-        browserReady: cloudDebug.getState().browserReady
+        phase: cloudState.phase,
+        browserReady: cloudState.browserReady,
+        verificationRequired: cloudState.verificationRequired === true,
+        error: cloudState.phase === 'error'
       }
     });
   }
@@ -186,7 +189,8 @@ server.listen(PORT, HOST, () => {
         const result = await cloudDebug.startLogin();
         console.log(`[cloud-debug] autostart phase=${result.phase} url=${result.url}`);
       } catch (error) {
-        cloudDebug.captureError(error);
+        const failedState = cloudDebug.captureError(error);
+        console.error('[cloud-debug] autostart phase=' + failedState.phase);
       }
     }, 1500);
   }
