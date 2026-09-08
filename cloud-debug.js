@@ -245,6 +245,32 @@ async function click(x, y) {
   return refreshMeta();
 }
 
+async function drag(startX, startY, endX, endY, duration = 600) {
+  await ensureBrowser();
+  const points = [startX, startY, endX, endY].map(Number);
+  if (points.some(value => !Number.isFinite(value))) throw new Error('Invalid drag coordinates');
+
+  const totalDuration = Math.min(2500, Math.max(250, Number(duration) || 600));
+  const steps = Math.max(8, Math.ceil(totalDuration / 25));
+  await page.mouse.move(points[0], points[1]);
+  await page.mouse.down();
+  try {
+    for (let index = 1; index <= steps; index++) {
+      const progress = index / steps;
+      await page.mouse.move(
+        points[0] + (points[2] - points[0]) * progress,
+        points[1] + (points[3] - points[1]) * progress
+      );
+      await page.waitForTimeout(Math.max(4, Math.round(totalDuration / steps)));
+    }
+  } finally {
+    await page.mouse.up();
+  }
+  await page.waitForTimeout(700);
+  touch({ lastAction: 'manual drag' });
+  return refreshMeta();
+}
+
 async function type(text) {
   await ensureBrowser();
   await page.keyboard.type(String(text || ''), { delay: 25 });
@@ -299,6 +325,7 @@ module.exports = {
   click,
   type,
   press,
+  drag,
   screenshot,
   reset,
   close,
