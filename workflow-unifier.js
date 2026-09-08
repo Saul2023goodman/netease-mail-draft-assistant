@@ -2,6 +2,7 @@
   'use strict';
 
   const Contacts = globalThis.NMDAContacts;
+  const DefaultPolicy = globalThis.NMDADefaultPolicy;
   const SETTINGS_KEY = 'nmda.followup.settings.v1';
   const REGISTRY_KEY = 'nmda.followup.import.registry.v1';
   const state = {
@@ -41,16 +42,8 @@
   }
 
   function defaultSettings() {
-    return {
-      mode: 'forward',
-      minDays: 7,
-      maxCount: 1,
-      blockHumanReply: true,
-      blockAutoReply: false,
-      fwPrefix: 'Fw:',
-      rePrefix: 'Re:',
-      template: 'Dear {{name}},\n\nI am writing to follow up on my previous email regarding {{subject}}. I would be grateful if you had a chance to review it.\n\nBest regards,'
-    };
+    const policy = DefaultPolicy?.followUp || {};
+    return { ...policy };
   }
 
   function normalizeSettings(value = {}) {
@@ -490,16 +483,6 @@
     grid.insertAdjacentElement('afterend', note);
   }
 
-  function retireLegacyFollowUpNavigation() {
-    const tab = $('[data-tab="followup"]');
-    if (tab) tab.remove();
-    const head = $('[data-page-head="followup"]');
-    if (head) { head.hidden = true; head.setAttribute('aria-hidden','true'); }
-    const pane = $('[data-pane="followup"]');
-    if (pane) { pane.hidden = true; pane.setAttribute('aria-hidden','true'); }
-    const manualFlag = $('#nmda-contact-modal-followup')?.closest('label');
-    if (manualFlag) manualFlag.hidden = true;
-  }
 
   function relabelProduct() {
     const batchTab = $('[data-tab="batch"] strong');
@@ -512,7 +495,6 @@
 
   function init() {
     if (!$('#nmda-root')) return;
-    retireLegacyFollowUpNavigation();
     relabelProduct();
     installImportEntry();
     createModal();

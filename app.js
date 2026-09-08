@@ -5,11 +5,11 @@
 
   const APP = 'NetEase Mail Draft Assistant';
   const STORAGE_KEY = 'nmda.form.v2';
-  const FOLLOWUP_SETTINGS_KEY = 'nmda.followup.settings.v1';
   const Importer = globalThis.NMDAImporter;
   const MailRecognizer = globalThis.NMDAMailRecognizer;
   const Contacts = globalThis.NMDAContacts;
   const Scheduler = globalThis.NMDAScheduler;
+  const Policy = globalThis.NMDAPolicyProfile;
   const Roster = globalThis.NMDARoster;
   const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
   const executionProgressHandlers = new Map();
@@ -175,40 +175,6 @@
   }
 
 
-  async function executeNativeFollowUpRemotely(task, { onProgress = () => {} } = {}) {
-    const executionId = crypto.randomUUID();
-    executionProgressHandlers.set(executionId, onProgress);
-    try {
-      const connection = await sendRuntimeMessage({ type:'NMDA_CONNECTION_STATUS' });
-      if (!connection?.connected) throw new Error('没有检测到已打开的网易邮箱。请先连接邮箱。');
-      if (!connection?.authenticated) throw new Error('网易邮箱页面已打开，但尚未检测到登录账号。请先完成登录。');
-      const result = await sendRuntimeMessage({
-        type:'NMDA_EXECUTE_FOLLOWUP', executionId,
-        task:{
-          mode:task.mode === 'reply' ? 'reply' : 'forward',
-          sourceMessageId:String(task.sourceMessageId || ''),
-          recipients:String(task.recipients || ''),
-          subject:String(task.subject || ''),
-          introText:String(task.introText || ''),
-          sourceSubject:String(task.sourceSubject || ''),
-          sourceBody:String(task.sourceBody || ''),
-          sourceIsHtml:task.sourceIsHtml !== false,
-          sourceFrom:String(task.sourceFrom || ''),
-          sourceTo:String(task.sourceTo || ''),
-          sourceCc:String(task.sourceCc || ''),
-          sourceDate:String(task.sourceDate || ''),
-          sourceAttachments:Array.isArray(task.sourceAttachments) ? task.sourceAttachments.map(item => ({name:String(item?.name||''),size:Number(item?.size||0)||0})).filter(item=>item.name) : [],
-          attachmentInventoryKnown:task.attachmentInventoryKnown === true,
-          hasAttachmentsHint:task.hasAttachmentsHint === true,
-          attachmentCountHint:Number(task.attachmentCountHint || 0) || 0
-        }
-      });
-      if (!result?.ok) throw new Error(result?.reason || '网易邮箱原生 Follow-up 执行器没有完成草稿创建。');
-      return result.outcome || {};
-    } finally {
-      executionProgressHandlers.delete(executionId);
-    }
-  }
 
   async function updateMailboxBatchMonitor(payload = {}) {
     try { return await sendRuntimeMessage({ type:'NMDA_BATCH_MONITOR', payload }); }
@@ -260,7 +226,6 @@
           <button class="nmda-tab is-active" data-tab="batch" type="button" title="批量草稿"><span class="nmda-tab-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="6" height="6" rx="1.5"/><rect x="14" y="4" width="6" height="6" rx="1.5"/><rect x="4" y="14" width="6" height="6" rx="1.5"/><rect x="14" y="14" width="6" height="6" rx="1.5"/></svg></span><span><strong>批量草稿</strong><small>导入 · 核验 · 排期</small></span></button>
           <button class="nmda-tab" data-tab="single" type="button" title="单封草稿"><span class="nmda-tab-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 19h4l10-10a2.2 2.2 0 0 0-4-4L5 15v4Z"/><path d="m13.5 6.5 4 4"/></svg></span><span><strong>单封草稿</strong><small>快速创建一封</small></span></button>
           <button class="nmda-tab" data-tab="contacts" type="button" title="联系人"><span class="nmda-tab-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.2"/><path d="M5.5 19c.7-3.2 3-5 6.5-5s5.8 1.8 6.5 5"/></svg></span><span><strong>联系人</strong><small>状态与联系记录</small></span></button>
-          <button class="nmda-tab" data-tab="followup" type="button" title="Follow-up"><span class="nmda-tab-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 7H5v-3"/><path d="M5.5 7.2A8 8 0 1 1 4 13"/><path d="M9 12h6"/><path d="m13 9 3 3-3 3"/></svg></span><span><strong>Follow-up</strong><small>回复核验 · 人工跟进</small></span></button>
 
         </nav>
 
@@ -749,12 +714,12 @@
                   <div class="nmda-schedule-dialog-summary" id="nmda-schedule-summary"></div>
                   <div class="nmda-scheduler-grid">
                     <label class="nmda-field"><span class="nmda-label">开始时间</span><input id="nmda-rule-start-at" type="datetime-local"></label>
-                    <label class="nmda-field"><span class="nmda-label">每所院校每轮最多</span><input id="nmda-rule-max-school" type="number" min="1" max="20" step="1" value="1"></label>
-                    <label class="nmda-field"><span class="nmda-label">同校间隔</span><div class="nmda-input-suffix"><input id="nmda-rule-interval-days" type="number" min="1" max="365" step="1" value="7"><span>天</span></div></label>
-                    <label class="nmda-check-card"><input id="nmda-rule-preserve-existing" type="checkbox" checked><span><strong>保留草稿 / 导入原排期</strong></span></label>
-                    <label class="nmda-check-card nmda-schedule-wide-check"><input id="nmda-rule-skip-holidays" type="checkbox" checked><span><strong>避开节假日和周末</strong></span></label>
+                    <label class="nmda-field"><span class="nmda-label">每组上限</span><input id="nmda-rule-max-school" type="number" min="1" max="20" step="1"></label>
+                    <label class="nmda-field"><span class="nmda-label">分组间隔</span><div class="nmda-input-suffix"><input id="nmda-rule-interval-days" type="number" min="1" max="365" step="1"><span>天</span></div></label>
+                    <label class="nmda-check-card"><input id="nmda-rule-preserve-existing" type="checkbox"><span><strong>保留已有排期</strong></span></label>
+                    <label class="nmda-check-card nmda-schedule-wide-check"><input id="nmda-rule-skip-holidays" type="checkbox"><span><strong>避开节假日和周末</strong></span></label>
                   </div>
-                  <div class="nmda-schedule-rule-preview" id="nmda-schedule-rule-preview">同校每 7 天最多 1 位。</div>
+                  <div class="nmda-schedule-rule-preview" id="nmda-schedule-rule-preview">按当前自动化策略安排。</div>
                 </section>
                 <footer class="nmda-workflow-dialog-foot">
                   <button class="nmda-btn nmda-btn-small nmda-btn-quiet" id="nmda-clear-auto-schedule" type="button">清除自动时间</button>
@@ -769,42 +734,6 @@
 
           </section>
 
-          <div class="nmda-page-head" data-page-head="followup" hidden>
-            <div><h2>Follow-up</h2><p>查看回复证据，按自定义条件人工生成跟进草稿。</p></div>
-          </div>
-          <section class="nmda-tabpane nmda-page nmda-followup-page" data-pane="followup" hidden>
-            <div class="nmda-contact-command-strip nmda-followup-command-strip">
-              <div class="nmda-contact-sync-state"><span class="nmda-contact-sync-dot"></span><div><strong>回复记录</strong><span id="nmda-followup-sync-meta" class="nmda-read-meta">尚未同步收件箱。</span></div></div>
-              <div id="nmda-followup-status" class="nmda-contact-status-inline">Follow-up 已就绪。</div>
-              <div class="nmda-contact-command-actions"><button class="nmda-btn nmda-btn-primary nmda-btn-small" id="nmda-followup-sync" type="button">同步邮箱与回复</button></div>
-            </div>
-
-            <div class="nmda-followup-layout">
-              <div class="nmda-card nmda-followup-list-card">
-                <div class="nmda-card-head nmda-list-head"><div><div class="nmda-card-title">可跟进邮件</div><div class="nmda-card-desc">条件只负责筛选；不会自动创建或发送任何邮件。</div></div><div id="nmda-followup-summary" class="nmda-summary nmda-summary-inline">0 个候选</div></div>
-                <div class="nmda-contact-toolbar nmda-followup-toolbar">
-                  <label class="nmda-contact-searchbox"><span>⌕</span><input id="nmda-followup-search" type="text" placeholder="搜索邮箱、姓名或原主题"></label>
-                  <select id="nmda-followup-filter"><option value="eligible">符合条件</option><option value="sent">全部已发送</option><option value="human">有真人回复</option><option value="auto">有 Auto Reply</option><option value="created">已创建 Follow-up</option></select>
-                </div>
-                <div class="nmda-table-wrap nmda-followup-table-wrap"><table class="nmda-table nmda-followup-table"><thead><tr><th>联系人</th><th>原邮件</th><th>回复</th><th>Follow-up</th><th></th></tr></thead><tbody id="nmda-followup-body"></tbody></table></div>
-              </div>
-
-              <aside class="nmda-card nmda-followup-settings-card">
-                <div class="nmda-card-head"><div><div class="nmda-card-title">跟进规则</div><div class="nmda-card-desc">用于筛选与生成格式；最终仍需人工触发。</div></div></div>
-                <div class="nmda-followup-settings-grid">
-                  <label class="nmda-field"><span class="nmda-label">跟进形式</span><select id="nmda-followup-mode"><option value="forward">Fw / 网易原生转发</option><option value="reply">Re / 网易原生回复</option><option value="new">新邮件</option></select></label>
-                  <label class="nmda-field"><span class="nmda-label">最少等待</span><div class="nmda-input-suffix"><input id="nmda-followup-min-days" type="number" min="0" max="365" step="1"><span>天</span></div></label>
-                  <label class="nmda-field"><span class="nmda-label">最多创建次数</span><input id="nmda-followup-max-count" type="number" min="0" max="20" step="1"><span class="nmda-hint">0 = 不限制</span></label>
-                  <label class="nmda-field"><span class="nmda-label">Fw 前缀</span><input id="nmda-followup-fw-prefix" type="text" placeholder="Fw:"></label>
-                  <label class="nmda-field"><span class="nmda-label">Re 前缀</span><input id="nmda-followup-re-prefix" type="text" placeholder="Re:"></label>
-                  <label class="nmda-check-card"><input id="nmda-followup-block-human" type="checkbox"><span><strong>真人回复后停止跟进</strong><small>默认开启</small></span></label>
-                  <label class="nmda-check-card"><input id="nmda-followup-block-auto" type="checkbox"><span><strong>Auto Reply 也视为已回复</strong><small>默认关闭</small></span></label>
-                  <label class="nmda-field nmda-followup-template-field"><span class="nmda-label">Follow-up 正文</span><textarea id="nmda-followup-template" rows="8"></textarea><span class="nmda-hint">变量：{{name}} · {{email}} · {{subject}} · {{days}}</span></label>
-                </div>
-                <div class="nmda-actions nmda-followup-settings-actions"><button class="nmda-btn nmda-btn-primary nmda-btn-small" id="nmda-followup-save-settings" type="button">保存规则</button><button class="nmda-btn nmda-btn-small nmda-btn-quiet" id="nmda-followup-reset-settings" type="button">恢复默认</button></div>
-              </aside>
-            </div>
-          </section>
 
           <div class="nmda-page-head" data-page-head="contacts" hidden>
             <div><h2>联系人</h2><p>浏览联系人；点开后再编辑状态和历史。</p></div>
@@ -831,13 +760,6 @@
             </div>
           </section>
 
-          <div class="nmda-workflow-modal-overlay" id="nmda-followup-reply-modal" hidden>
-            <section class="nmda-workflow-dialog nmda-followup-reply-dialog" role="dialog" aria-modal="true" aria-labelledby="nmda-followup-reply-title">
-              <header class="nmda-workflow-dialog-head"><div><span class="nmda-dialog-eyebrow">回复详情</span><h3 id="nmda-followup-reply-title">邮件回复</h3><p id="nmda-followup-reply-meta"></p></div><button class="nmda-dialog-close" id="nmda-followup-reply-close" type="button" aria-label="关闭回复详情">×</button></header>
-              <div class="nmda-followup-reply-body"><div id="nmda-followup-reply-badge"></div><div id="nmda-followup-reply-fields" class="nmda-followup-reply-fields"></div><div id="nmda-followup-reply-attachments" class="nmda-followup-reply-attachments" hidden></div><article id="nmda-followup-reply-content" class="nmda-followup-reply-content">正在读取…</article></div>
-              <footer class="nmda-workflow-dialog-foot"><div class="nmda-dialog-foot-spacer"></div><button class="nmda-btn nmda-btn-small" id="nmda-followup-reply-close-secondary" type="button">关闭</button></footer>
-            </section>
-          </div>
 
           <div class="nmda-workflow-modal-overlay" id="nmda-contact-modal" hidden>
             <section class="nmda-workflow-dialog nmda-contact-dialog" role="dialog" aria-modal="true" aria-labelledby="nmda-contact-dialog-title">
@@ -851,7 +773,6 @@
                   <div class="nmda-contact-editor-grid">
                     <label class="nmda-field"><span class="nmda-label">互动阶段</span><select id="nmda-contact-modal-stage"></select></label>
                     <label class="nmda-field"><span class="nmda-label">发送策略</span><select id="nmda-contact-modal-policy"></select></label>
-                    <label class="nmda-check-card"><input id="nmda-contact-modal-followup" type="checkbox"><span><strong>待跟进</strong></span></label>
                     <label class="nmda-field nmda-contact-modal-tags"><span class="nmda-label">长期标记</span><input id="nmda-contact-modal-tags" type="text" placeholder="重点;第一批"></label>
                   </div>
                 </section>
@@ -1057,9 +978,6 @@
     return !panel.hidden && currentWorkbenchTab() === 'contacts';
   }
 
-  function followUpPaneVisible() {
-    return !panel.hidden && currentWorkbenchTab() === 'followup';
-  }
 
   function scheduleBatchRender({ aux = false, force = false } = {}) {
     invalidateBatchView(aux);
@@ -1192,7 +1110,6 @@
     if(!Contacts) return [];
     const c=Contacts.normalizeContactShape(contact||{});
     const items=[{kind:'stage',value:c.stage||'未联系'}];
-    if(c.followUp)items.push({kind:'followup',value:'待跟进'});
     if(c.policy&&c.policy!=='正常')items.push({kind:'policy',value:c.policy});
     for(const tag of (Contacts.parseContactTags?.(c.tags||[])||[]))items.push({kind:'tag',value:tag});
     return items;
@@ -1324,7 +1241,6 @@
     stage.innerHTML=Contacts.STAGE_OPTIONS.map(value=>`<option value="${escapeHtml(value)}">${escapeHtml(value)}</option>`).join('');
     policy.innerHTML=Contacts.POLICY_OPTIONS.map(value=>`<option value="${escapeHtml(value)}">${escapeHtml(value)}</option>`).join('');
     stage.value=contact.stage||'未联系'; policy.value=contact.policy||'正常';
-    $('nmda-contact-modal-followup').checked=!!contact.followUp;
     $('nmda-contact-modal-tags').value=tagsText(contact.tags);
     $('nmda-contact-profile-summary').innerHTML=`<div><strong>${Number(contact.sentCount||0)}</strong><span>已发送</span></div><div><strong>${Number(contact.draftCount||0)}</strong><span>草稿</span></div><div><strong>${escapeHtml(Contacts.formatDisplayTime(contact.lastSentAt))}</strong><span>最后发送</span></div><div><strong>${escapeHtml(Contacts.formatDisplayTime(contact.lastDraftAt))}</strong><span>最后草稿</span></div>`;
     $('nmda-contact-history-summary').textContent=`发送 ${Number(contact.sentCount||0)} · 草稿 ${Number(contact.draftCount||0)}`;
@@ -1343,7 +1259,6 @@
     const email=batch.contactModalEmail; if(!email||!Contacts)return;
     Contacts.setStage(contactBook.contacts,email,$('nmda-contact-modal-stage').value);
     Contacts.setPolicy(contactBook.contacts,email,$('nmda-contact-modal-policy').value);
-    Contacts.setFollowUp(contactBook.contacts,email,$('nmda-contact-modal-followup').checked);
     Contacts.setTags(contactBook.contacts,email,$('nmda-contact-modal-tags').value);
     markContactsChanged(); await persistContacts(); scheduleContactsRender({force:true}); invalidateBatchView(true);
     setContactStatusMessage(`已保存 ${email}。`,'ok'); closeContactModal();
@@ -1362,342 +1277,6 @@
   }
 
 
-  const followUpState = {
-    settings: null,
-    loading: false,
-    busyEmails: new Set(),
-    search: '',
-    filter: 'eligible',
-    formHydrated: false
-  };
-
-  function defaultFollowUpSettings() {
-    return {
-      mode: 'forward', minDays: 7, maxCount: 1,
-      blockHumanReply: true, blockAutoReply: false,
-      fwPrefix: 'Fw:', rePrefix: 'Re:',
-      template: 'Dear {{name}},\n\nI am writing to follow up on my previous email regarding {{subject}}. I would be grateful if you had a chance to review it.\n\nBest regards,'
-    };
-  }
-
-  function normalizeFollowUpSettings(value = {}) {
-    const base = defaultFollowUpSettings();
-    const mode = ['forward','reply','new'].includes(value.mode) ? value.mode : base.mode;
-    return {
-      ...base, ...value, mode,
-      minDays: Math.max(0, Math.min(365, Number(value.minDays ?? base.minDays) || 0)),
-      maxCount: Math.max(0, Math.min(20, Number(value.maxCount ?? base.maxCount) || 0)),
-      blockHumanReply: value.blockHumanReply !== false,
-      blockAutoReply: value.blockAutoReply === true,
-      fwPrefix: String(value.fwPrefix ?? base.fwPrefix).trim() || 'Fw:',
-      rePrefix: String(value.rePrefix ?? base.rePrefix).trim() || 'Re:',
-      template: String(value.template ?? base.template)
-    };
-  }
-
-  async function loadFollowUpSettings(force = false) {
-    if (followUpState.settings && !force) return followUpState.settings;
-    const stored = (await storageGet(FOLLOWUP_SETTINGS_KEY))[FOLLOWUP_SETTINGS_KEY];
-    followUpState.settings = normalizeFollowUpSettings(stored || {});
-    return followUpState.settings;
-  }
-
-  async function saveFollowUpSettings(settings) {
-    followUpState.settings = normalizeFollowUpSettings(settings);
-    await storageSet({ [FOLLOWUP_SETTINGS_KEY]: followUpState.settings });
-    return followUpState.settings;
-  }
-
-  function followUpSettingsFromForm() {
-    return normalizeFollowUpSettings({
-      mode: $('nmda-followup-mode')?.value || 'forward',
-      minDays: $('nmda-followup-min-days')?.value,
-      maxCount: $('nmda-followup-max-count')?.value,
-      blockHumanReply: !!$('nmda-followup-block-human')?.checked,
-      blockAutoReply: !!$('nmda-followup-block-auto')?.checked,
-      fwPrefix: $('nmda-followup-fw-prefix')?.value || 'Fw:',
-      rePrefix: $('nmda-followup-re-prefix')?.value || 'Re:',
-      template: $('nmda-followup-template')?.value || ''
-    });
-  }
-
-  function fillFollowUpSettingsForm(settings) {
-    settings = normalizeFollowUpSettings(settings || {});
-    if ($('nmda-followup-mode')) $('nmda-followup-mode').value = settings.mode;
-    if ($('nmda-followup-min-days')) $('nmda-followup-min-days').value = String(settings.minDays);
-    if ($('nmda-followup-max-count')) $('nmda-followup-max-count').value = String(settings.maxCount);
-    if ($('nmda-followup-block-human')) $('nmda-followup-block-human').checked = !!settings.blockHumanReply;
-    if ($('nmda-followup-block-auto')) $('nmda-followup-block-auto').checked = !!settings.blockAutoReply;
-    if ($('nmda-followup-fw-prefix')) $('nmda-followup-fw-prefix').value = settings.fwPrefix;
-    if ($('nmda-followup-re-prefix')) $('nmda-followup-re-prefix').value = settings.rePrefix;
-    if ($('nmda-followup-template')) $('nmda-followup-template').value = settings.template;
-  }
-
-  function setFollowUpStatus(message, kind = '') {
-    const el = $('nmda-followup-status');
-    if (!el) return;
-    el.textContent = String(message || '');
-    if (kind) el.dataset.kind = kind; else delete el.dataset.kind;
-  }
-
-  function stripMailPrefix(subject) {
-    return String(subject || '').replace(/^\s*(?:(?:re|fw|fwd)\s*:\s*)+/i, '').trim();
-  }
-
-  function sortedSentHistory(contact) {
-    return [...(contact?.history || [])].filter(item => item?.id).sort((a,b)=>(Date.parse(b.sentAt||'')||0)-(Date.parse(a.sentAt||'')||0));
-  }
-
-  function sourceSentForContact(contact) {
-    const history = sortedSentHistory(contact);
-    return history.find(item => !/^\s*(?:fw|fwd|re)\s*:/i.test(String(item.subject || ''))) || history[0] || null;
-  }
-
-  function repliesAfter(contact, sentAt) {
-    const floor = Date.parse(sentAt || '') || 0;
-    return [...(contact?.replyHistory || [])].filter(item => (Date.parse(item.receivedAt || '') || 0) > floor);
-  }
-
-  function followUpEligibility(contact, settings) {
-    contact = Contacts.normalizeContactShape(contact || {});
-    settings = normalizeFollowUpSettings(settings || {});
-    const source = sourceSentForContact(contact);
-    if (!source) return { eligible:false, source:null, reasons:['没有可跟进的已发送邮件'], humanReplies:[], autoReplies:[], days:0 };
-    const sourceMs = Date.parse(source.sentAt || '') || 0;
-    const days = sourceMs ? Math.max(0, Math.floor((Date.now() - sourceMs) / 86400000)) : 0;
-    const replies = repliesAfter(contact, source.sentAt);
-    const humanReplies = replies.filter(item => !item.autoReply);
-    const autoReplies = replies.filter(item => item.autoReply);
-    const reasons = [];
-    if (contact.policy === '暂停') reasons.push('发送策略为“暂停”');
-    if (contact.policy === '不再联系') reasons.push('发送策略为“不再联系”');
-    if (days < settings.minDays) reasons.push(`仅等待 ${days} 天，规则要求 ${settings.minDays} 天`);
-    if (settings.blockHumanReply && humanReplies.length) reasons.push('已有真人回复');
-    if (settings.blockAutoReply && autoReplies.length) reasons.push('已有 Auto Reply');
-    if (settings.maxCount > 0 && Number(contact.followUpCount || 0) >= settings.maxCount) reasons.push(`已达到 ${settings.maxCount} 次上限`);
-    return { eligible: !reasons.length, source, reasons, humanReplies, autoReplies, days };
-  }
-
-  function followUpBadge(label, tone = '') {
-    return `<span class="nmda-followup-badge"${tone ? ` data-tone="${escapeHtml(tone)}"` : ''}>${escapeHtml(label)}</span>`;
-  }
-
-  function autoReplyReasonLabel(reason) {
-    return ({
-      'auto-header':'邮件头明确标记自动回复',
-      'auto-subject':'主题符合自动回复特征',
-      'auto-body':'正文开头符合自动回复 / Out of Office 特征',
-      'subject-pattern':'主题符合自动回复特征',
-      'sender-pattern':'发件地址属于自动回复 / 系统地址',
-      'mailbox-flag':'邮箱列表标记为自动回复',
-      'detail-inspection':'读取邮件详情后识别为自动回复'
-    })[String(reason || '')] || String(reason || 'Auto Reply 特征');
-  }
-
-  function followUpReplyHtml(contact, eligibility) {
-    const latestHuman = eligibility.humanReplies[0];
-    const latestAuto = eligibility.autoReplies[0];
-    if (latestHuman) return `${followUpBadge('真人回复','human')}<button type="button" class="nmda-followup-link" data-followup-reply="${escapeHtml(contact.email)}" data-reply-id="${escapeHtml(latestHuman.id)}">查看</button>`;
-    if (latestAuto) return `${followUpBadge('Auto Reply','auto')}<button type="button" class="nmda-followup-link" data-followup-reply="${escapeHtml(contact.email)}" data-reply-id="${escapeHtml(latestAuto.id)}">查看</button>`;
-    return followUpBadge('未发现回复','quiet');
-  }
-
-  async function renderFollowUp() {
-    if (!Contacts || !followUpPaneVisible()) return;
-    await ensureContactBook();
-    const settings = await loadFollowUpSettings();
-    if (!followUpState.formHydrated) { fillFollowUpSettingsForm(settings); followUpState.formHydrated = true; }
-    const body = $('nmda-followup-body'), summary = $('nmda-followup-summary');
-    if (!body || !summary) return;
-    const query = String($('nmda-followup-search')?.value || followUpState.search || '').trim().toLowerCase();
-    const filter = $('nmda-followup-filter')?.value || followUpState.filter || 'eligible';
-    followUpState.search = query; followUpState.filter = filter;
-    const rows = [];
-    for (const raw of Object.values(contactBook.contacts || {})) {
-      const contact = Contacts.normalizeContactShape(raw);
-      if (!Number(contact.sentCount || 0)) continue;
-      const eligibility = followUpEligibility(contact, settings);
-      const haystack = `${contact.email} ${contact.name||''} ${eligibility.source?.subject||''}`.toLowerCase();
-      if (query && !haystack.includes(query)) continue;
-      if (filter === 'eligible' && !eligibility.eligible) continue;
-      if (filter === 'human' && !eligibility.humanReplies.length) continue;
-      if (filter === 'auto' && !eligibility.autoReplies.length) continue;
-      if (filter === 'created' && !Number(contact.followUpCount || 0)) continue;
-      rows.push({contact,eligibility});
-    }
-    rows.sort((a,b)=>{
-      if (a.eligibility.eligible !== b.eligibility.eligible) return a.eligibility.eligible ? -1 : 1;
-      return (Date.parse(a.eligibility.source?.sentAt||'')||0) - (Date.parse(b.eligibility.source?.sentAt||'')||0);
-    });
-    const eligibleAll = Object.values(contactBook.contacts || {}).filter(raw => Number(raw?.sentCount||0) && followUpEligibility(raw, settings).eligible).length;
-    summary.textContent = `${eligibleAll} 个符合条件 · 当前显示 ${rows.length}`;
-    body.innerHTML = rows.length ? rows.map(({contact,eligibility}) => {
-      const source = eligibility.source || {};
-      const busy = followUpState.busyEmails.has(contact.email);
-      const reason = eligibility.eligible ? `已等待 ${eligibility.days} 天` : eligibility.reasons.join('；');
-      return `<tr>
-        <td class="nmda-contact-identity-cell"><strong>${escapeHtml(contact.name||contact.email)}</strong><small>${escapeHtml(contact.name?contact.email:'')}</small></td>
-        <td class="nmda-followup-source-cell"><strong title="${escapeHtml(source.subject||'')}">${escapeHtml(source.subject||'(无主题)')}</strong><small>${escapeHtml(Contacts.formatDisplayTime(source.sentAt))} · ${eligibility.days} 天</small></td>
-        <td><div class="nmda-followup-reply-cell">${followUpReplyHtml(contact, eligibility)}</div></td>
-        <td class="nmda-followup-state-cell"><strong>${escapeHtml(reason)}</strong><small>已创建 ${Number(contact.followUpCount||0)} 次</small></td>
-        <td class="nmda-contact-open-cell"><button class="nmda-btn nmda-btn-small ${eligibility.eligible?'nmda-btn-primary':''}" type="button" data-followup-create="${escapeHtml(contact.email)}" ${eligibility.eligible && !busy ? '' : 'disabled'}>${busy?'正在创建…':'生成跟进草稿'}</button></td>
-      </tr>`;
-    }).join('') : '<tr><td colspan="5" class="nmda-empty-table-cell">当前没有匹配的 Follow-up 对象。</td></tr>';
-    const meta = await Contacts.loadSyncMeta(contactBook.account).catch(()=>({}));
-    const metaEl = $('nmda-followup-sync-meta');
-    if (metaEl) metaEl.textContent = meta?.inbox ? `收件箱 ${meta.inbox.read ?? 0}${meta.inbox.complete ? '（完整）' : meta.inbox.total ? ` / ${meta.inbox.total}` : ''} · ${meta.lastQuickAt || meta.lastFullAt ? `最近同步 ${Contacts.formatDisplayTime(meta.lastQuickAt || meta.lastFullAt)}` : '尚未同步'}` : '尚未同步收件箱。';
-  }
-
-  function renderFollowUpTemplate(template, contact, source, days) {
-    const vars = { name: contact.name || '', email: contact.email || '', subject: stripMailPrefix(source.subject || ''), days: String(days || 0) };
-    return String(template || '').replace(/{{\s*(name|email|subject|days)\s*}}/gi, (_, key) => vars[String(key).toLowerCase()] ?? '');
-  }
-
-  function plainFollowUpHtml(text) {
-    return `<div class="nmda-followup-note">${escapeHtml(String(text || '')).replace(/\n/g,'<br>')}</div>`;
-  }
-
-  function buildFollowUpDraft(contact, eligibility, detail, settings) {
-    const source = eligibility.source;
-    const baseSubject = stripMailPrefix(source.subject || detail.subject || '');
-    let subject = baseSubject;
-    if (settings.mode === 'forward') subject = `${settings.fwPrefix} ${baseSubject}`.trim();
-    else if (settings.mode === 'reply') subject = `${settings.rePrefix} ${baseSubject}`.trim();
-    const introText = renderFollowUpTemplate(settings.template, contact, source, eligibility.days);
-    const introHtml = plainFollowUpHtml(introText);
-    const originalHtml = detail.bodyHtml && detail.isHtml !== false ? String(detail.bodyHtml) : plainFollowUpHtml(detail.body || '');
-    const header = `<div class="nmda-forward-header"><br><br>---------- ${settings.mode==='forward'?'Forwarded message':'Original message'} ----------<br>From: ${escapeHtml(detail.from || '')}<br>Date: ${escapeHtml(detail.date || source.sentAt || '')}<br>Subject: ${escapeHtml(detail.subject || source.subject || '')}<br>To: ${escapeHtml(detail.to || contact.email || '')}</div>`;
-    const quoted = settings.mode === 'reply' ? `<blockquote style="margin:14px 0 0 0;padding-left:12px;border-left:2px solid #d0d7de">${header}${originalHtml}</blockquote>` : `${header}${originalHtml}`;
-    return { recipients:contact.email, subject, body:introText, bodyHtml:`${introHtml}${quoted}`, bodyIsHtml:true, files:[], scheduleAt:'' };
-  }
-
-  async function createFollowUpDraft(email) {
-    if (!email || followUpState.busyEmails.has(email)) return;
-    await ensureContactBook();
-    const contact = Contacts.normalizeContactShape(contactBook.contacts[email] || {});
-    const settings = await loadFollowUpSettings();
-    const eligibility = followUpEligibility(contact, settings);
-    if (!eligibility.eligible) { setFollowUpStatus(`不能生成 ${email}：${eligibility.reasons.join('；')}`, 'warn'); return; }
-    followUpState.busyEmails.add(email); renderFollowUp().catch(()=>{});
-    try {
-      setFollowUpStatus(`正在读取 ${email} 的原邮件并创建 ${settings.mode==='forward'?'Fw':settings.mode==='reply'?'Re':'新邮件'} 草稿…`);
-      const detail = await sendRuntimeMessage({ type:'NMDA_READ_MESSAGE_DETAIL', summary:eligibility.source });
-      if (!detail?.ok) throw new Error(detail?.reason || '无法读取原邮件正文');
-      const task = buildFollowUpDraft(contact, eligibility, detail, settings);
-      let outcome;
-      if (settings.mode === 'forward' || settings.mode === 'reply') {
-        outcome = await executeNativeFollowUpRemotely({
-          mode:settings.mode,
-          sourceMessageId:eligibility.source.id,
-          recipients:contact.email,
-          subject:task.subject,
-          introText:renderFollowUpTemplate(settings.template, contact, eligibility.source, eligibility.days),
-          sourceSubject:detail.subject || eligibility.source.subject || '',
-          sourceBody:detail.body || '',
-          sourceIsHtml:detail.isHtml !== false,
-          sourceFrom:detail.from || '',
-          sourceTo:detail.to || '',
-          sourceCc:detail.cc || '',
-          sourceDate:detail.date || eligibility.source.sentAt || '',
-          sourceAttachments:detail.attachments || [],
-          attachmentInventoryKnown:detail.attachmentInventoryKnown === true,
-          hasAttachmentsHint:detail.hasAttachmentsHint === true || eligibility.source.hasAttachmentsHint === true,
-          attachmentCountHint:Number(detail.attachmentCountHint || eligibility.source.attachmentCountHint || 0) || 0
-        }, { onProgress:info => setFollowUpStatus(info?.message || '正在创建原生 Follow-up 草稿…') });
-      } else {
-        outcome = await executeDraftRemotely(task, { fresh:true, onProgress:info => setFollowUpStatus(info?.message || '正在创建草稿…') });
-      }
-      const verification = outcome?.nativeVerification || null;
-      const verifiedNote = verification
-        ? `原生${verification.mode === 'forward' ? '转发' : '回复'}核验：模式/收件人/主题/原文/原信信息${verification.attachmentsExpected ? `/附件 ${verification.attachmentsMatched}/${verification.attachmentsExpected}` : ''}完整`
-        : (outcome?.saveOutcome?.evidence || '');
-      Contacts.addFollowUpEvent(contactBook.contacts, email, {
-        mode: settings.mode, sourceMessageId: eligibility.source.id, sourceSubject: eligibility.source.subject,
-        subject: task.subject, status:'draft', note: verifiedNote, verification
-      });
-      await persistContacts(); markContactsChanged();
-      setFollowUpStatus(`${email} 的 Follow-up 草稿已创建、内容完整性已核验并确认保存。`, 'ok');
-    } catch (error) {
-      setFollowUpStatus(`Follow-up 创建失败：${error.message}`, 'error');
-    } finally {
-      followUpState.busyEmails.delete(email);
-      renderFollowUp().catch(()=>{});
-    }
-  }
-
-  function closeFollowUpReplyModal() {
-    const modal = $('nmda-followup-reply-modal'); if (modal) modal.hidden = true; syncModalState();
-  }
-
-  async function openFollowUpReply(email, replyId) {
-    await ensureContactBook();
-    const contact = Contacts.normalizeContactShape(contactBook.contacts[email] || {});
-    const item = (contact.replyHistory || []).find(entry => String(entry.id) === String(replyId));
-    if (!item) { setFollowUpStatus('没有找到这条回复记录，请先同步邮箱。','warn'); return; }
-    const modal = $('nmda-followup-reply-modal'); if (!modal) return;
-    modal.hidden = false; syncModalState();
-    $('nmda-followup-reply-title').textContent = item.subject || '(无主题)';
-    $('nmda-followup-reply-meta').textContent = `${item.from || email} · ${Contacts.formatDisplayTime(item.receivedAt)}`;
-    $('nmda-followup-reply-badge').innerHTML = followUpBadge(item.autoReply ? 'Auto Reply' : '真人回复', item.autoReply ? 'auto' : 'human');
-    $('nmda-followup-reply-fields').innerHTML = `<span><b>From</b>${escapeHtml(item.from || email)}</span><span><b>Date</b>${escapeHtml(Contacts.formatDisplayTime(item.receivedAt))}</span>`;
-    const attachmentsBox = $('nmda-followup-reply-attachments'); if (attachmentsBox) { attachmentsBox.hidden = true; attachmentsBox.innerHTML = ''; }
-    $('nmda-followup-reply-content').textContent = '正在读取邮件正文…';
-    const detail = await sendRuntimeMessage({ type:'NMDA_READ_MESSAGE_DETAIL', summary:{id:item.id, subject:item.subject, receivedAt:item.receivedAt} });
-    if (!detail?.ok) { $('nmda-followup-reply-content').textContent = `读取失败：${detail?.reason || '未知错误'}`; return; }
-    $('nmda-followup-reply-fields').innerHTML = [
-      ['From', detail.from || item.from || email], ['To', detail.to || '—'], ['Cc', detail.cc || '—'],
-      ['Date', detail.date ? Contacts.formatDisplayTime(detail.date) : Contacts.formatDisplayTime(item.receivedAt)],
-      ['判定依据', detail.autoReply ? autoReplyReasonLabel(detail.autoReplyReason) : '未发现自动回复特征']
-    ].map(([key,value]) => `<span><b>${escapeHtml(key)}</b>${escapeHtml(value || '—')}</span>`).join('');
-    if (attachmentsBox) {
-      const attachments = Array.isArray(detail.attachments) ? detail.attachments : [];
-      attachmentsBox.hidden = !attachments.length;
-      attachmentsBox.innerHTML = attachments.length ? `<strong>附件 ${attachments.length}</strong><div>${attachments.map(att => `<span>${escapeHtml(att.name || '(未命名附件)')}${att.size ? ` · ${escapeHtml(String(att.size))} B` : ''}</span>`).join('')}</div>` : '';
-    }
-    const refinedAuto = !!detail.autoReply;
-    if (refinedAuto !== !!item.autoReply) {
-      item.autoReply = refinedAuto;
-      item.autoReplyReason = detail.autoReplyReason || 'detail-inspection';
-      contact.replyHistory = [...(contact.replyHistory || [])];
-      contact.humanReplyCount = contact.replyHistory.filter(entry=>!entry.autoReply).length;
-      contact.autoReplyCount = contact.replyHistory.filter(entry=>entry.autoReply).length;
-      if (contact.stageSource !== 'manual') {
-        if (contact.humanReplyCount > 0) { contact.stage='已回复'; contact.stageSource='mailbox'; }
-        else if (contact.sentCount > 0 || contact.knownSentAt) { contact.stage='已发送'; contact.stageSource='mailbox'; }
-        else { contact.stage='未联系'; contact.stageSource='default'; }
-        contact.status=contact.stage;
-      }
-      contactBook.contacts[email]=contact; markContactsChanged(); await persistContacts();
-    }
-    $('nmda-followup-reply-badge').innerHTML = followUpBadge(refinedAuto ? 'Auto Reply' : '真人回复', refinedAuto ? 'auto' : 'human');
-    $('nmda-followup-reply-content').textContent = detail.body || '(邮件正文为空)';
-    renderFollowUp().catch(()=>{});
-  }
-
-  $('nmda-followup-save-settings')?.addEventListener('click', async () => {
-    const settings = await saveFollowUpSettings(followUpSettingsFromForm());
-    fillFollowUpSettingsForm(settings); followUpState.formHydrated = true; setFollowUpStatus('Follow-up 规则已保存。','ok'); await renderFollowUp();
-  });
-  $('nmda-followup-reset-settings')?.addEventListener('click', async () => {
-    const settings = await saveFollowUpSettings(defaultFollowUpSettings()); fillFollowUpSettingsForm(settings); followUpState.formHydrated = true; setFollowUpStatus('已恢复默认规则。','ok'); await renderFollowUp();
-  });
-  $('nmda-followup-search')?.addEventListener('input', debounce(()=>renderFollowUp().catch(()=>{}),120));
-  $('nmda-followup-filter')?.addEventListener('change',()=>renderFollowUp().catch(()=>{}));
-  $('nmda-followup-mode')?.addEventListener('change',()=>{ followUpState.settings = followUpSettingsFromForm(); renderFollowUp().catch(()=>{}); });
-  ['nmda-followup-min-days','nmda-followup-max-count','nmda-followup-block-human','nmda-followup-block-auto','nmda-followup-fw-prefix','nmda-followup-re-prefix'].forEach(id => $(id)?.addEventListener('change',()=>{ followUpState.settings = followUpSettingsFromForm(); renderFollowUp().catch(()=>{}); }));
-  $('nmda-followup-template')?.addEventListener('input', debounce(()=>{ followUpState.settings = followUpSettingsFromForm(); },120));
-  $('nmda-followup-sync')?.addEventListener('click', async event => {
-    event.currentTarget.disabled = true;
-    try { const ok = await runMailboxRead('quick'); if (ok) setFollowUpStatus('邮箱与回复记录已同步。','ok'); await renderFollowUp(); }
-    finally { event.currentTarget.disabled = false; }
-  });
-  $('nmda-followup-body')?.addEventListener('click', event => {
-    const create = event.target.closest?.('[data-followup-create]'); if (create) { createFollowUpDraft(create.dataset.followupCreate).catch(error=>setFollowUpStatus(error.message,'error')); return; }
-    const reply = event.target.closest?.('[data-followup-reply]'); if (reply) openFollowUpReply(reply.dataset.followupReply, reply.dataset.replyId).catch(error=>setFollowUpStatus(`回复读取失败：${error.message}`,'error'));
-  });
-  $('nmda-followup-reply-close')?.addEventListener('click', closeFollowUpReplyModal);
-  $('nmda-followup-reply-close-secondary')?.addEventListener('click', closeFollowUpReplyModal);
-  $('nmda-followup-reply-modal')?.addEventListener('click', event => { if (event.target === event.currentTarget) closeFollowUpReplyModal(); });
 
 
   $('nmda-contact-class-chips')?.addEventListener('click',event=>{
@@ -1731,9 +1310,6 @@
     }else if(el.dataset.contactPolicy){
       Contacts.setPolicy(contactBook.contacts,el.dataset.contactPolicy,el.value);
       message=`已更新 ${el.dataset.contactPolicy} 的联系策略：${el.value}。`;kind=el.value==='正常'?'ok':'warn';affectsPolicy=true;
-    }else if(el.dataset.contactFollowup){
-      Contacts.setFollowUp(contactBook.contacts,el.dataset.contactFollowup,el.checked);
-      message=`${el.dataset.contactFollowup}${el.checked?' 已标记':' 已取消'}待跟进。`;affectsBatchView=true;
     }else if(el.dataset.contactTagsEmail){
       const contact=Contacts.setTags(contactBook.contacts,el.dataset.contactTagsEmail,el.value);
       message=`已更新 ${el.dataset.contactTagsEmail} 的长期标记：${tagsText(contact?.tags)||'无'}。`;affectsBatchView=true;
@@ -1867,7 +1443,6 @@
     // and defer that work until the browser can paint the tab transition first.
     if (name === 'batch' && viewPerf.batchDirty) scheduleBatchRender();
     if (name === 'contacts' && viewPerf.contactsDirty) scheduleContactsRender();
-    if (name === 'followup') renderFollowUp().catch(error => setFollowUpStatus(`加载失败：${error.message}`, 'error'));
   }
 
   launcher.addEventListener('click', () => {
@@ -1921,7 +1496,7 @@
     attachmentOverrides: new Map(), attachmentPolicies: new Map(), attachmentTargetEditing:'', attachmentTargetSearch:'', taskEdits: new Map(), running: false, stopRequested: false,
     importMeta: null, profileSuggestion: null,
     sessionId: 0, importBusy: false, schedulePlan: null,
-    scheduleRules: { ...(Scheduler?.DEFAULT_RULES || { maxPerGroupPerRound:1, intervalDays:7, preserveExisting:true, intraRoundMinutes:10 }), startAt: Scheduler?.defaultStart?.() || '' },
+    scheduleRules: null,
     roster: emptyRosterState(), duplicateAudit:null,
     handoffComplete: false, autoAdvancing: false, reviewFilter: 'all', reviewSearch: '', reviewSelected: new Set(), duplicateSelections: new Map(), attachmentAttentionShown: false, rosterPromptChoice:'idle', attachmentPromptDeferred:false, attachmentPrepChoice:'idle', supplementPreflightDone:false, supplementPreflightOpen:false, preflightView:'files', supportView:'roster', attachmentManagerOpen:false, uiStep:1, planningView:'rules', reviewReturnStep:2, contactModalEmail:'', sourceInspectName:'', preflightFolderPath:'', preflightSearch:'', preflightReviewOnly:false, preflightPurposeFilter:'', ignoredAttachmentIdentities:new Set(), bulkSubjectPromptAutoShown:false, bulkSubjectPromptDismissed:false
   };
@@ -1950,49 +1525,37 @@
 
   function isCurrentBatchSession(token) { return Number(token) === Number(batch.sessionId); }
 
-  const SCHEDULE_PREFS_KEY = 'nmda.schedule.rules.v1';
-  function loadScheduleRulePrefs() {
-    try { const raw=JSON.parse(localStorage.getItem(SCHEDULE_PREFS_KEY)||'{}'); return Scheduler?.normalizeRules?.({...raw,startAt:''}) || raw; }
-    catch (_) { return {}; }
-  }
   function freshScheduleRules() {
-    const prefs=loadScheduleRulePrefs();
-    return {
-      ...(Scheduler?.DEFAULT_RULES || {maxPerGroupPerRound:1,intervalDays:7,preserveExisting:true,intraRoundMinutes:10,skipHolidays:true}),
-      ...prefs,
-      startAt: Scheduler?.defaultStart?.() || ''
-    };
-  }
-  function saveScheduleRulePrefs(rules) {
-    try { localStorage.setItem(SCHEDULE_PREFS_KEY, JSON.stringify({maxPerGroupPerRound:rules.maxPerGroupPerRound,intervalDays:rules.intervalDays,preserveExisting:rules.preserveExisting,intraRoundMinutes:rules.intraRoundMinutes||10,skipHolidays:rules.skipHolidays!==false})); } catch (_) {}
+    const effective = Policy?.effectiveSchedule?.() || {};
+    const startAt = Policy?.suggestedStart?.() || '';
+    return Scheduler?.normalizeRules?.({ ...effective, startAt, policySource:'explicit' }) || { ...effective, startAt };
   }
   function syncScheduleRuleControls() {
     if(!batch.scheduleRules) batch.scheduleRules=freshScheduleRules();
     if(scheduleStartEl && document.activeElement!==scheduleStartEl) scheduleStartEl.value=batch.scheduleRules.startAt||'';
-    if(scheduleMaxSchoolEl && document.activeElement!==scheduleMaxSchoolEl) scheduleMaxSchoolEl.value=String(batch.scheduleRules.maxPerGroupPerRound||1);
-    if(scheduleIntervalDaysEl && document.activeElement!==scheduleIntervalDaysEl) scheduleIntervalDaysEl.value=String(batch.scheduleRules.intervalDays||7);
-    if(schedulePreserveEl) schedulePreserveEl.checked=batch.scheduleRules.preserveExisting!==false;
-    if(scheduleHolidayEl) scheduleHolidayEl.checked=batch.scheduleRules.skipHolidays!==false;
+    if(scheduleMaxSchoolEl && document.activeElement!==scheduleMaxSchoolEl) scheduleMaxSchoolEl.value=batch.scheduleRules.maxPerGroupPerRound == null ? '' : String(batch.scheduleRules.maxPerGroupPerRound);
+    if(scheduleIntervalDaysEl && document.activeElement!==scheduleIntervalDaysEl) scheduleIntervalDaysEl.value=batch.scheduleRules.intervalDays == null ? '' : String(batch.scheduleRules.intervalDays);
+    if(schedulePreserveEl) schedulePreserveEl.checked=!!batch.scheduleRules.preserveExisting;
+    if(scheduleHolidayEl) scheduleHolidayEl.checked=!!batch.scheduleRules.skipHolidays;
   }
   function readScheduleRuleControls() {
-    const rules=Scheduler?.normalizeRules?.({
-      startAt:scheduleStartEl?.value||batch.scheduleRules?.startAt||'',
-      maxPerGroupPerRound:scheduleMaxSchoolEl?.value||1,
-      intervalDays:scheduleIntervalDaysEl?.value||7,
-      preserveExisting:schedulePreserveEl?.checked!==false,
-      intraRoundMinutes:batch.scheduleRules?.intraRoundMinutes||10,
-      skipHolidays:scheduleHolidayEl?.checked!==false
-    }) || {startAt:scheduleStartEl?.value||'',maxPerGroupPerRound:Number(scheduleMaxSchoolEl?.value||1),intervalDays:Number(scheduleIntervalDaysEl?.value||7),preserveExisting:schedulePreserveEl?.checked!==false,skipHolidays:scheduleHolidayEl?.checked!==false};
-    batch.scheduleRules=rules; saveScheduleRulePrefs(rules); return rules;
+    const effective = Policy?.effectiveSchedule?.() || {};
+    const input = {
+      ...effective,
+      startAt:scheduleStartEl?.value||batch.scheduleRules?.startAt||Policy?.suggestedStart?.()||'',
+      grouping:Policy?.getGrouping?.()||effective.grouping||'none',
+      maxPerGroupPerRound:scheduleMaxSchoolEl?.value||effective.maxPerGroupPerRound,
+      intervalDays:scheduleIntervalDaysEl?.value||effective.intervalDays,
+      preserveExisting:!!schedulePreserveEl?.checked,
+      intraRoundMinutes:effective.intraRoundMinutes,
+      skipHolidays:!!scheduleHolidayEl?.checked,
+      policySource:'explicit'
+    };
+    const rules=Scheduler?.normalizeRules?.(input)||input;
+    batch.scheduleRules=rules;
+    return rules;
   }
   batch.scheduleRules = freshScheduleRules();
-  (async()=>{
-    try{
-      if(localStorage.getItem(SCHEDULE_PREFS_KEY))return;
-      const legacy=await sendRuntimeMessage({type:'NMDA_LEGACY_PREFS'});
-      if(legacy?.ok&&legacy.scheduleRules){localStorage.setItem(SCHEDULE_PREFS_KEY,legacy.scheduleRules);batch.scheduleRules=freshScheduleRules();syncScheduleRuleControls();}
-    }catch(_){}
-  })();
 
   // One delegated handler replaces hundreds of row listeners that used to be
   // destroyed and rebound after every table refresh.
@@ -5329,10 +4892,10 @@
     if(scheduleSummaryEl)scheduleSummaryEl.innerHTML=`<strong>${selected.length}</strong> 已选 · 自动 ${auto} · 已有 ${protectedCount} · 待排 ${unscheduled}${conflictCount?` · <span class="nmda-danger">同校冲突 ${conflictCount}</span>`:''}${holidayConflictCount?` · <span class="nmda-danger">休息日 ${holidayConflictCount}</span>`:''}`;
     if(scheduleRulePreviewEl){
       const conflictText=conflictCount?` · ${conflictCount} 个同校时间冲突`:'';const holidayText=holidayConflictCount?` · ${holidayConflictCount} 个已有时间落在休息日`:'';
-      scheduleRulePreviewEl.textContent=`当前规则：每所院校每轮最多 ${rules.maxPerGroupPerRound||1} 位 · 间隔 ${rules.intervalDays||7} 天${rules.skipHolidays!==false?' · 跳过节假日/周末':''}${conflictText}${holidayText}`;
+      scheduleRulePreviewEl.textContent=`当前规则：每所院校每轮最多 ${rules.maxPerGroupPerRound} 位 · 间隔 ${rules.intervalDays} 天${!!rules.skipHolidays?' · 跳过节假日/周末':''}${conflictText}${holidayText}`;
     }
     const ruleChip=$('nmda-planning-rule-chip');
-    if(ruleChip)ruleChip.textContent=`每校每轮 ${rules.maxPerGroupPerRound||1} 位 · 间隔 ${rules.intervalDays||7} 天${rules.skipHolidays!==false?' · 避开休息日':''}${conflictCount?` · ${conflictCount} 个冲突`:''}`;
+    if(ruleChip)ruleChip.textContent=`每校每轮 ${rules.maxPerGroupPerRound} 位 · 间隔 ${rules.intervalDays} 天${!!rules.skipHolidays?' · 避开休息日':''}${conflictCount?` · ${conflictCount} 个冲突`:''}`;
     const scheduleContextCopy=$('nmda-schedule-context-copy');
     if(scheduleContextCopy){
       const rosterCount=referenceRosterCount();
