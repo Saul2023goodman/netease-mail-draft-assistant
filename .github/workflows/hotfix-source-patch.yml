@@ -1,0 +1,41 @@
+name: Temporary App Source Patch
+
+on:
+  push:
+    branches:
+      - hotfix/app-blank-4.1.1
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: ${{ !contains(github.event.head_commit.message, '[hotfix-patched]') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: hotfix/app-blank-4.1.1
+      - name: Patch unsafe review portal bootstrap
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('app.js')
+          text = p.read_text(encoding='utf-8')
+          old = "  const reviewPortal=ui.querySelector('#nmda-inline-review');\n  ui.querySelector('#nmda-panel')?.appendChild(reviewPortal);"
+          new = "  const reviewPortal=ui.querySelector('#nmda-inline-review');\n  const reviewHost=ui.querySelector('#nmda-panel');\n  if(reviewPortal && reviewHost) reviewHost.appendChild(reviewPortal);"
+          if old not in text:
+              raise SystemExit('expected bootstrap sequence not found; refusing broad patch')
+          p.write_text(text.replace(old, new, 1), encoding='utf-8')
+          PY
+      - name: Commit patch
+        shell: bash
+        run: |
+          if git diff --quiet -- app.js; then exit 0; fi
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add app.js
+          git commit -m "fix: tolerate removed review surface [hotfix-patched]"
+          git push origin HEAD:hotfix/app-blank-4.1.1
