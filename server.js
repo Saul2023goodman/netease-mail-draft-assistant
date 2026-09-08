@@ -109,6 +109,13 @@ async function handleDebugApi(req, res, pathname) {
       return sendJson(res, 200, await cloudDebug.click(body.x, body.y));
     }
 
+    if (pathname === '/debug/api/drag' && req.method === 'POST') {
+      const body = await readJson(req);
+      return sendJson(res, 200, await cloudDebug.drag(
+        body.startX, body.startY, body.endX, body.endY, body.duration
+      ));
+    }
+
     if (pathname === '/debug/api/type' && req.method === 'POST') {
       const body = await readJson(req);
       return sendJson(res, 200, await cloudDebug.type(body.text));
