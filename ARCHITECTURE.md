@@ -2,18 +2,28 @@
 
 ## Product center
 
-The product is an outreach task workbench. The only primary business object is a task.
+The product is a standalone outreach task workbench. The only primary business object is a task.
 
-Every task follows one pipeline:
+Every task follows one visible pipeline:
 
 1. source intake
-2. automatic recognition
-3. exception review only when required
+2. recognition and inline source correction when necessary
+3. exception review
 4. scheduling
 5. draft execution in NetEase Mail
 6. mailbox evidence refresh
 
 A single email and a large batch use the same pipeline. Features must not create parallel workflows when they can enter this task model as a source, preference, evidence record, or execution mode.
+
+## Standalone UI rule
+
+`app.html` is the only product workspace opened by the extension action. There is **no floating launcher**, no in-page launcher button, and no launcher-first bootstrap that later attempts to reveal the real panel.
+
+The standalone workbench constructs its panel directly. Removing a supporting surface must never prevent the core workbench from appearing.
+
+Flow transitions happen only after an **explicit user action** or the direct completion of the operation the user just started. Import may populate task data, but it must not automatically navigate through review, scheduling, or execution. There is no hidden stage machine and no perpetual connection polling.
+
+A normal selection change is a local state update. It must not reparse all source files, rebuild the whole import model, or restart unrelated async work.
 
 ## Priority model
 
@@ -21,10 +31,10 @@ A single email and a large batch use the same pipeline. Features must not create
 
 - file / folder / pasted source intake
 - recipient, subject, body and attachment recognition
-- exception review and correction
+- exception review and direct correction
 - roster-assisted ordering and grouping when roster evidence exists
-- scheduling and preservation of existing schedules
-- draft creation / execution and progress feedback
+- explicit scheduling and preservation of existing schedules
+- sequential draft creation with per-task progress and retry
 - NetEase connection, authentication and execution reliability
 
 ### Supporting — contextual, not top-level
@@ -35,7 +45,7 @@ A single email and a large batch use the same pipeline. Features must not create
 - native Fw / Re execution for tasks created from historical mail
 - manual contact pause / stop controls
 
-Supporting capabilities should appear only where they help the current task. They must not become independent workbenches.
+Supporting capabilities should appear only where they help the current task. They must not become independent workbenches or participate in the startup critical path.
 
 ### Internal constraints — never product navigation
 
@@ -55,11 +65,17 @@ The UI may surface eligible historical messages from mailbox evidence and let th
 
 Existing storage keys may retain legacy `followup` names for upgrade compatibility. New user-facing copy and new module names should use `history source` semantics.
 
-## Preference rule
+## Scheduling rule
 
-Scheduling defaults and user choices are preferences around execution, not policy screens. The scheduler validates and executes the resolved rules; preferences only supply defaults and explicit user overrides.
+Scheduling defaults and user choices are execution preferences, not a policy screen. The workbench reads the current controls only when the user clicks the schedule action, then the scheduler validates and builds a plan. Selection or import must not silently recompute schedules.
 
 No named institution, historical batch, user example or one-off workaround may be shipped as core logic.
+
+## Execution rule
+
+Draft creation is sequential and task-local. One failed draft must not stall the batch. Completed tasks retain their completed state; failed tasks remain retryable after the current run. A stop request finishes the current task and then stops cleanly.
+
+Authentication failure does not start a wait loop. The workbench opens NetEase Mail, asks the user to finish login, and returns control immediately.
 
 ## Change test
 
