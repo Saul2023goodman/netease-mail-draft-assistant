@@ -417,7 +417,8 @@
   // Review is a task modal, not part of any stage canvas. Detaching it prevents
   // stage visibility rules from hiding it when the user opens review from planning.
   const reviewPortal=ui.querySelector('#nmda-inline-review');
-  ui.querySelector('#nmda-panel')?.appendChild(reviewPortal);
+  const reviewHost=ui.querySelector('#nmda-panel');
+  if(reviewPortal && reviewHost) reviewHost.appendChild(reviewPortal);
   // Attachment workspace is a shared portal too: import, review and planning all open
   // exactly the same panel, so no stage visibility rule may own or hide it.
   const attachmentPortal=ui.querySelector('#nmda-attachment-manager-overlay');
