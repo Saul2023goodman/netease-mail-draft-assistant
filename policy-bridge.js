@@ -5,6 +5,15 @@
   const Scheduler = globalThis.NMDAScheduler;
   if (!Policy || !Scheduler || typeof document === 'undefined') return;
 
+  const nativeInstitutionEvidence = Scheduler.institutionEvidence.bind(Scheduler);
+  Scheduler.institutionEvidence = (value, recipients = '', source = '', options = {}) => {
+    const result = nativeInstitutionEvidence(value, recipients, source, options);
+    if (result.valid || String(source || '').toLowerCase() !== 'recognized') return result;
+    const text = String(value || '').normalize('NFKC').trim();
+    if (!text || result.reason === 'short-code') return result;
+    return { ...result, valid:true, value:text, reason:'recognized-source', candidate:true, groupable:false };
+  };
+
   const byId = id => document.getElementById(id);
   let rendering = false;
 
