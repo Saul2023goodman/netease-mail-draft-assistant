@@ -10,7 +10,6 @@ body.nmda-app-body{min-width:640px;}
 #nmda-root.nmda-standalone .nmda-page{padding:10px 12px;overscroll-behavior:contain;}
 #nmda-root.nmda-standalone .nmda-page-head{padding-left:22px;padding-right:22px;}
 #nmda-root.nmda-standalone #nmda-expand,#nmda-root.nmda-standalone #nmda-close{display:none!important;}
-#nmda-root.nmda-standalone .nmda-tabpane{contain:none!important;}
 #nmda-root.nmda-standalone .nmda-supplement-preflight,#nmda-root.nmda-standalone .nmda-attachment-manager-overlay{position:fixed!important;inset:0!important;width:100vw!important;height:100dvh!important;max-width:none!important;max-height:none!important;z-index:2147483647!important;}
 .nmda-mail-connection{min-width:250px;display:grid;grid-template-columns:10px minmax(0,1fr) auto;align-items:center;gap:8px;padding:6px 7px 6px 9px;border:1px solid #d0d7de;border-radius:10px;background:#fff;}
 .nmda-mail-connection-dot{width:8px;height:8px;border-radius:999px;background:#8c959f;box-shadow:0 0 0 3px #f0f2f4;}

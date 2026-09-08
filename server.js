@@ -21,15 +21,23 @@ const MIME = {
   '.ico': 'image/x-icon'
 };
 
-function send(res, status, body, type = 'text/plain; charset=utf-8', extraHeaders = {}) {
-  res.writeHead(status, {
+const SECURITY_HEADERS = {
+  'X-Content-Type-Options': 'nosniff',
+  'Referrer-Policy': 'no-referrer',
+  'X-Frame-Options': 'DENY'
+};
+
+function responseHeaders(type, cacheControl = 'no-store', extraHeaders = {}) {
+  return {
     'Content-Type': type,
-    'Cache-Control': 'no-store',
-    'X-Content-Type-Options': 'nosniff',
-    'Referrer-Policy': 'no-referrer',
-    'X-Frame-Options': 'DENY',
+    'Cache-Control': cacheControl,
+    ...SECURITY_HEADERS,
     ...extraHeaders
-  });
+  };
+}
+
+function send(res, status, body, type = 'text/plain; charset=utf-8', extraHeaders = {}) {
+  res.writeHead(status, responseHeaders(type, 'no-store', extraHeaders));
   res.end(body);
 }
 
@@ -175,13 +183,8 @@ const server = http.createServer(async (req, res) => {
     if (statErr || !stat.isFile()) return send(res, 404, 'Not Found');
 
     const type = MIME[path.extname(filePath).toLowerCase()] || 'application/octet-stream';
-    res.writeHead(200, {
-      'Content-Type': type,
-      'Cache-Control': filePath.endsWith('.html') ? 'no-store' : 'public, max-age=300',
-      'X-Content-Type-Options': 'nosniff',
-      'Referrer-Policy': 'no-referrer',
-      'X-Frame-Options': 'DENY'
-    });
+    const cacheControl = filePath.endsWith('.html') ? 'no-store' : 'public, max-age=300';
+    res.writeHead(200, responseHeaders(type, cacheControl));
 
     if (req.method === 'HEAD') return res.end();
     fs.createReadStream(filePath).pipe(res);
