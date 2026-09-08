@@ -10,7 +10,7 @@ The product has one primary workflow:
 
 A single email and a large batch use the same task model. Files, folders, pasted content, rosters, attachments and eligible historical messages are sources that feed the same pipeline.
 
-Version 5 removes the old launcher/stage-machine UI. Clicking the Chrome extension action opens `app.html` directly; the app never renders a floating N launcher and never relies on “create launcher first, reveal panel later” bootstrap behavior.
+Version 5 removes the old launcher/stage-machine UI. Clicking the Chrome extension action opens `app.html` directly; the app renders no page-level N launcher or N brand mark and never relies on “create launcher first, reveal panel later” bootstrap behavior.
 
 The workbench does not automatically jump through stages. Import generates tasks, selection is a local state change, scheduling runs only when the user applies it, and execution runs only when the user starts it. One failed draft does not stop unrelated tasks; failures remain retryable.
 
