@@ -32,7 +32,16 @@ jobs:
             exit 1
           fi
           OUT="$(mktemp)"
-          "$CHROME" --headless=new --no-sandbox --disable-gpu --allow-file-access-from-files --virtual-time-budget=2500 --dump-dom "file://$PWD/app.html" > "$OUT"
+          ERR="$(mktemp)"
+          set +e
+          timeout 20s "$CHROME" --headless=new --no-sandbox --disable-gpu --disable-background-networking --disable-component-update --disable-default-apps --no-first-run --allow-file-access-from-files --dump-dom "file://$PWD/app.html" > "$OUT" 2> "$ERR"
+          STATUS=$?
+          set -e
+          if [ ! -s "$OUT" ]; then
+            echo "Chrome produced no DOM (exit $STATUS)"
+            cat "$ERR"
+            exit 1
+          fi
           grep -q 'id="nmda-root"' "$OUT"
           grep -q 'id="nmda-panel"' "$OUT"
           if grep -E 'id="nmda-panel"[^>]*hidden' "$OUT"; then
