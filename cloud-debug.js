@@ -137,18 +137,41 @@ async function clickLoginButton(frame) {
   return true;
 }
 
+function isMailboxLoggedInUrl(url = '') {
+  return /mail\.163\.com\/(js\d|main|entry|webmail)/i.test(url) || /main\.jsp/i.test(url);
+}
+
 async function detectMailboxState() {
   await refreshMeta();
-  const current = state.url || '';
-  if (/mail\.163\.com\/(js\d|main|entry|webmail)/i.test(current) || /main\.jsp/i.test(current)) {
-    return 'logged_in';
-  }
+  const frames = page ? page.frames() : [];
+  const urls = [
+    state.url || '',
+    ...frames.map(frame => {
+      try { return frame.url() || ''; } catch (_) { return ''; }
+    })
+  ];
+  if (urls.some(isMailboxLoggedInUrl)) return 'logged_in';
 
-  let body = '';
-  try { body = await page.locator('body').innerText({ timeout: 2500 }); } catch (_) {}
-  if (/收件箱/.test(body) && /写信/.test(body)) return 'logged_in';
-  if (/验证码|安全验证|滑块|人机验证|完成验证|请验证/i.test(body)) return 'verification_required';
-  return 'unknown';
+  let verificationRequired = false;
+  for (const frame of frames) {
+    let body = '';
+    try { body = await frame.locator('body').innerText({ timeout: 1500 }); } catch (_) {}
+    if (/收件箱/.test(body) && /写信/.test(body)) return 'logged_in';
+    if (/验证码|安全验证|滑块|人机验证|完成验证|请验证/i.test(body)) verificationRequired = true;
+  }
+  return verificationRequired ? 'verification_required' : 'unknown';
+}
+
+async function waitForMailboxState(timeoutMs = 30000) {
+  const deadline = Date.now() + Math.max(1000, Number(timeoutMs || 0));
+  let detected = 'unknown';
+  while (Date.now() < deadline) {
+    detected = await detectMailboxState();
+    if (detected !== 'unknown') return detected;
+    touch({ phase: 'awaiting_login_result', lastAction: 'wait for login result' });
+    await page.waitForTimeout(1000);
+  }
+  return detected;
 }
 
 async function startLogin() {
@@ -189,8 +212,8 @@ async function startLogin() {
   const clicked = await clickLoginButton(credentials.frame);
   if (!clicked) throw new Error('Could not find NetEase login button');
 
-  await page.waitForTimeout(6000);
-  detected = await detectMailboxState();
+  touch({ phase: 'awaiting_login_result', lastAction: 'wait for login result' });
+  detected = await waitForMailboxState(30000);
 
   if (detected === 'logged_in') {
     touch({ phase: 'logged_in', verificationRequired: false, lastAction: 'login successful' });
