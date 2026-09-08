@@ -2,9 +2,12 @@
   "name": "netease-mail-draft-assistant",
   "version": "3.7.0",
   "private": true,
-  "description": "Railway static host for the NetEase Mail Draft Assistant workspace UI",
+  "description": "NetEase Mail Draft Assistant Railway preview and Playwright cloud debug runtime",
   "scripts": {
     "start": "node server.js"
+  },
+  "dependencies": {
+    "playwright": "^1.55.0"
   },
   "engines": {
     "node": ">=20"
