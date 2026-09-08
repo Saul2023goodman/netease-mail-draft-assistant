@@ -3,7 +3,7 @@ name: CSS cleanup round 3
 on:
   push:
     branches:
-      - refactor/css-legacy-cleanup-round3
+      - main
 
 permissions:
   contents: write
@@ -18,11 +18,12 @@ jobs:
       - name: Prune dead legacy CSS
         run: python3 .github/scripts/prune-css-round3.py
 
-      - name: Verify and commit
+      - name: Verify and self-clean
         run: |
           git diff --check
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add app.css
+          git rm .github/scripts/prune-css-round3.py .github/workflows/css-cleanup-round3.yml
+          git add -A
           git commit -m "refactor: remove dead legacy UI styles"
-          git push origin HEAD:refactor/css-legacy-cleanup-round3
+          git push origin HEAD:main
