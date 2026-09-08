@@ -43,6 +43,85 @@
     } catch (_) {}
   }
 
+  const standaloneMode = !extensionRuntime?.sendMessage;
+  const DEBUG_TOKEN_KEY = 'nmda.railway.debug.token';
+
+  function standaloneDebugToken() {
+    if (!standaloneMode) return '';
+    try { return window.localStorage.getItem(DEBUG_TOKEN_KEY) || ''; } catch (_) { return ''; }
+  }
+
+  function clearStandaloneDebugToken() {
+    try { window.localStorage.removeItem(DEBUG_TOKEN_KEY); } catch (_) {}
+  }
+
+  async function standaloneDebugRequest(path, method = 'GET', body) {
+    const token = standaloneDebugToken();
+    if (!token) return null;
+    const response = await fetch(path, {
+      method,
+      cache: 'no-store',
+      headers: { 'Content-Type': 'application/json', 'X-Debug-Token': token },
+      body: body === undefined ? undefined : JSON.stringify(body)
+    });
+    if (!response.ok) {
+      const detail = await response.text().catch(() => '');
+      const error = new Error(detail || ('云端调试请求失败（HTTP ' + response.status + '）'));
+      error.status = response.status;
+      throw error;
+    }
+    return response.json();
+  }
+
+  function standaloneStateFromDebug(source, needsToken = false) {
+    const phase = String(source?.phase || 'idle');
+    const browserReady = source?.browserReady === true;
+    const inFlight = !['idle', 'logged_in', 'error'].includes(phase);
+    return {
+      ok: true,
+      connected: browserReady || inFlight || phase === 'logged_in',
+      authenticated: phase === 'logged_in',
+      account: '',
+      standalone: true,
+      phase,
+      verificationRequired: source?.verificationRequired === true || phase === 'verification_required',
+      needsToken,
+      error: String(source?.lastError || '')
+    };
+  }
+
+  async function standaloneMailboxState() {
+    if (!standaloneMode) return null;
+    let token = standaloneDebugToken();
+    if (token) {
+      try {
+        return standaloneStateFromDebug(await standaloneDebugRequest('/debug/api/status'), false);
+      } catch (error) {
+        if (error?.status !== 401) {
+          return { ok: false, connected: false, authenticated: false, account: '', standalone: true, needsToken: false, error: error?.message || String(error) };
+        }
+        clearStandaloneDebugToken();
+        token = '';
+      }
+    }
+    try {
+      const response = await fetch('/health', { cache: 'no-store' });
+      if (!response.ok) throw new Error('健康状态不可用（HTTP ' + response.status + '）');
+      const payload = await response.json();
+      return standaloneStateFromDebug(payload?.cloudDebug || {}, !token);
+    } catch (error) {
+      return {
+        ok: false,
+        connected: false,
+        authenticated: false,
+        account: '',
+        standalone: true,
+        needsToken: !standaloneDebugToken(),
+        error: error?.message || String(error)
+      };
+    }
+  }
+
   function uniqueFiles(files) {
     const map = new Map();
     for (const file of files || []) {
@@ -840,12 +919,35 @@
   async function refreshMailboxConnection(){
     if(!connectionEl)return null;
     try{
-      const state=await sendRuntimeMessage({type:'NMDA_CONNECTION_STATUS'});
+      const state=standaloneMode ? await standaloneMailboxState() : await sendRuntimeMessage({type:'NMDA_CONNECTION_STATUS'});
       const connected=!!state?.connected, authenticated=!!state?.authenticated;
       connectionEl.dataset.state=authenticated?'connected':connected?'login':'offline';
-      connectionTitleEl.textContent=authenticated?(state.account?`网易邮箱 · ${state.account}`:'网易邮箱已连接'):connected?'网易邮箱已打开 · 待登录':'网易邮箱未连接';
-      connectionDetailEl.textContent=authenticated?'已连接':connected?'请先登录':'未连接';
-      openMailEl.textContent=connected?'切换邮箱':'连接邮箱';
+      if(state?.standalone){
+        if(authenticated){
+          connectionTitleEl.textContent='网易邮箱已连接';
+          connectionDetailEl.textContent='云端浏览器已登录';
+        }else if(state.verificationRequired){
+          connectionTitleEl.textContent='需要人工验证';
+          connectionDetailEl.textContent='请在云端调试台完成验证';
+        }else if(state.phase && !['idle','error'].includes(state.phase)){
+          connectionTitleEl.textContent='正在连接网易邮箱';
+          connectionDetailEl.textContent='云端浏览器处理中';
+        }else if(state.error){
+          connectionTitleEl.textContent='连接状态不可用';
+          connectionDetailEl.textContent=state.error;
+        }else if(state.needsToken){
+          connectionTitleEl.textContent='云端邮箱未连接';
+          connectionDetailEl.textContent='点击连接邮箱打开调试台';
+        }else{
+          connectionTitleEl.textContent='网易邮箱未连接';
+          connectionDetailEl.textContent='点击连接邮箱开始登录';
+        }
+        openMailEl.textContent=authenticated?'切换邮箱':'连接邮箱';
+      }else{
+        connectionTitleEl.textContent=authenticated?(state.account?'网易邮箱 · '+state.account:'网易邮箱已连接'):connected?'网易邮箱已打开 · 待登录':'网易邮箱未连接';
+        connectionDetailEl.textContent=authenticated?'已连接':connected?'请先登录':'未连接';
+        openMailEl.textContent=connected?'切换邮箱':'连接邮箱';
+      }
       if(authenticated && state.account && typeof Contacts!=='undefined') {
         const normalized=Contacts?.normalizeEmail?.(state.account)||String(state.account).toLowerCase();
         if(contactBook?.loaded && contactBook.account!==normalized){await ensureContactBook(true);scheduleContactsRender({force:currentWorkbenchTab()==='contacts'});invalidateBatchView(true);}
@@ -855,7 +957,36 @@
       connectionEl.dataset.state='offline'; connectionTitleEl.textContent='连接状态不可用'; connectionDetailEl.textContent=error?.message||String(error); return null;
     }
   }
-  openMailEl?.addEventListener('click',async()=>{openMailEl.disabled=true;try{await sendRuntimeMessage({type:'NMDA_OPEN_MAIL',focus:true});}finally{openMailEl.disabled=false;setTimeout(refreshMailboxConnection,500);}});
+  async function connectMailbox(){
+    if(!standaloneMode) return sendRuntimeMessage({type:'NMDA_OPEN_MAIL',focus:true});
+    if(!standaloneDebugToken()){
+      window.location.assign('/debug');
+      return {ok:true,openedDebug:true};
+    }
+    return standaloneDebugRequest('/debug/api/login','POST',{});
+  }
+
+  openMailEl?.addEventListener('click',async()=>{
+    openMailEl.disabled=true;
+    try{
+      const result=await connectMailbox();
+      if(!result?.openedDebug) await refreshMailboxConnection();
+    }catch(error){
+      if(error?.status===401){
+        clearStandaloneDebugToken();
+        connectionEl.dataset.state='offline';
+        connectionTitleEl.textContent='需要重新授权';
+        connectionDetailEl.textContent='请在云端调试台重新输入 Token';
+      }else{
+        connectionEl.dataset.state='offline';
+        connectionTitleEl.textContent='连接失败';
+        connectionDetailEl.textContent=error?.message||String(error);
+      }
+    }finally{
+      openMailEl.disabled=false;
+      setTimeout(refreshMailboxConnection,500);
+    }
+  });
   if (extensionRuntime?.onMessage?.addListener) {
     extensionRuntime.onMessage.addListener(message=>{
     if(message?.type==='NMDA_CONNECTION_CHANGED') refreshMailboxConnection();
