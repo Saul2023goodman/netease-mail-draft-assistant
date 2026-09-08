@@ -14,6 +14,35 @@
   const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
   const executionProgressHandlers = new Map();
 
+  // The standalone Railway preview does not have the extension APIs. Keep the
+  // workbench interactive there while preserving the real extension behavior.
+  const extensionRuntime = globalThis.chrome?.runtime || null;
+  const extensionStorage = globalThis.chrome?.storage?.local || null;
+
+  async function sendRuntimeMessage(message) {
+    if (!extensionRuntime?.sendMessage) return null;
+    return extensionRuntime.sendMessage(message);
+  }
+
+  async function storageGet(key) {
+    if (extensionStorage?.get) return extensionStorage.get(key);
+    try {
+      const raw = window.localStorage.getItem(key);
+      return raw == null ? {} : { [key]: JSON.parse(raw) };
+    } catch (_) {
+      return {};
+    }
+  }
+
+  async function storageSet(values) {
+    if (extensionStorage?.set) return extensionStorage.set(values);
+    try {
+      for (const [key, value] of Object.entries(values || {})) {
+        window.localStorage.setItem(key, JSON.stringify(value));
+      }
+    } catch (_) {}
+  }
+
   function uniqueFiles(files) {
     const map = new Map();
     for (const file of files || []) {
@@ -45,10 +74,10 @@
     const refs = await prepareVaultRefs(task.files || []);
     executionProgressHandlers.set(executionId, onProgress);
     try {
-      const connection = await chrome.runtime.sendMessage({ type: 'NMDA_CONNECTION_STATUS' });
+      const connection = await sendRuntimeMessage({ type: 'NMDA_CONNECTION_STATUS' });
       if (!connection?.connected) throw new Error('没有检测到已打开的网易邮箱。请先点击右上角“打开网易邮箱”并完成登录。');
       if (!connection?.authenticated) throw new Error('网易邮箱页面已打开，但尚未检测到登录账号。请先完成登录。');
-      const result = await chrome.runtime.sendMessage({
+      const result = await sendRuntimeMessage({
         type: 'NMDA_EXECUTE_DRAFT', executionId, fresh,
         task: {
           recipients: task.recipients || '', cc: task.cc || '', bcc: task.bcc || '',
@@ -71,10 +100,10 @@
     const executionId = crypto.randomUUID();
     executionProgressHandlers.set(executionId, onProgress);
     try {
-      const connection = await chrome.runtime.sendMessage({ type:'NMDA_CONNECTION_STATUS' });
+      const connection = await sendRuntimeMessage({ type:'NMDA_CONNECTION_STATUS' });
       if (!connection?.connected) throw new Error('没有检测到已打开的网易邮箱。请先连接邮箱。');
       if (!connection?.authenticated) throw new Error('网易邮箱页面已打开，但尚未检测到登录账号。请先完成登录。');
-      const result = await chrome.runtime.sendMessage({
+      const result = await sendRuntimeMessage({
         type:'NMDA_EXECUTE_FOLLOWUP', executionId,
         task:{
           mode:task.mode === 'reply' ? 'reply' : 'forward',
@@ -103,7 +132,7 @@
   }
 
   async function updateMailboxBatchMonitor(payload = {}) {
-    try { return await chrome.runtime.sendMessage({ type:'NMDA_BATCH_MONITOR', payload }); }
+    try { return await sendRuntimeMessage({ type:'NMDA_BATCH_MONITOR', payload }); }
     catch (_) { return null; }
   }
 
@@ -112,7 +141,7 @@
     let last = null;
     while (Date.now() < deadline) {
       try {
-        last = await chrome.runtime.sendMessage({ type:'NMDA_CONNECTION_STATUS' });
+        last = await sendRuntimeMessage({ type:'NMDA_CONNECTION_STATUS' });
         if (last?.connected && last?.authenticated) return last;
       } catch (_) {}
       await sleep(260);
@@ -811,7 +840,7 @@
   async function refreshMailboxConnection(){
     if(!connectionEl)return null;
     try{
-      const state=await chrome.runtime.sendMessage({type:'NMDA_CONNECTION_STATUS'});
+      const state=await sendRuntimeMessage({type:'NMDA_CONNECTION_STATUS'});
       const connected=!!state?.connected, authenticated=!!state?.authenticated;
       connectionEl.dataset.state=authenticated?'connected':connected?'login':'offline';
       connectionTitleEl.textContent=authenticated?(state.account?`网易邮箱 · ${state.account}`:'网易邮箱已连接'):connected?'网易邮箱已打开 · 待登录':'网易邮箱未连接';
@@ -826,8 +855,9 @@
       connectionEl.dataset.state='offline'; connectionTitleEl.textContent='连接状态不可用'; connectionDetailEl.textContent=error?.message||String(error); return null;
     }
   }
-  openMailEl?.addEventListener('click',async()=>{openMailEl.disabled=true;try{await chrome.runtime.sendMessage({type:'NMDA_OPEN_MAIL',focus:true});}finally{openMailEl.disabled=false;setTimeout(refreshMailboxConnection,500);}});
-  chrome.runtime.onMessage.addListener(message=>{
+  openMailEl?.addEventListener('click',async()=>{openMailEl.disabled=true;try{await sendRuntimeMessage({type:'NMDA_OPEN_MAIL',focus:true});}finally{openMailEl.disabled=false;setTimeout(refreshMailboxConnection,500);}});
+  if (extensionRuntime?.onMessage?.addListener) {
+    extensionRuntime.onMessage.addListener(message=>{
     if(message?.type==='NMDA_CONNECTION_CHANGED') refreshMailboxConnection();
     if(message?.type==='NMDA_EXECUTION_PROGRESS_BROADCAST'){
       const handler=executionProgressHandlers.get(String(message.executionId||'')); if(handler) handler(message);
@@ -837,7 +867,8 @@
       if(batchStopEl)batchStopEl.disabled=true;
       setBatchStatus('网易邮箱已请求停止：当前这一封完成后不会继续下一封。','warn');
     }
-  });
+    });
+  }
   window.addEventListener('focus',refreshMailboxConnection);
   document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshMailboxConnection();});
   refreshMailboxConnection();
@@ -918,7 +949,7 @@
 
   async function detectAccount() {
     try {
-      const result = await chrome.runtime.sendMessage({ type: 'NMDA_ACCOUNT_INFO' });
+      const result = await sendRuntimeMessage({ type: 'NMDA_ACCOUNT_INFO' });
       if (result?.ok && result.uid) return Contacts?.normalizeEmail?.(result.uid) || String(result.uid).toLowerCase();
     } catch (_) {}
     const text = document.querySelector('#spnUid')?.textContent || '';
@@ -1230,14 +1261,14 @@
 
   async function loadFollowUpSettings(force = false) {
     if (followUpState.settings && !force) return followUpState.settings;
-    const stored = (await chrome.storage.local.get(FOLLOWUP_SETTINGS_KEY))[FOLLOWUP_SETTINGS_KEY];
+    const stored = (await storageGet(FOLLOWUP_SETTINGS_KEY))[FOLLOWUP_SETTINGS_KEY];
     followUpState.settings = normalizeFollowUpSettings(stored || {});
     return followUpState.settings;
   }
 
   async function saveFollowUpSettings(settings) {
     followUpState.settings = normalizeFollowUpSettings(settings);
-    await chrome.storage.local.set({ [FOLLOWUP_SETTINGS_KEY]: followUpState.settings });
+    await storageSet({ [FOLLOWUP_SETTINGS_KEY]: followUpState.settings });
     return followUpState.settings;
   }
 
@@ -1414,7 +1445,7 @@
     followUpState.busyEmails.add(email); renderFollowUp().catch(()=>{});
     try {
       setFollowUpStatus(`正在读取 ${email} 的原邮件并创建 ${settings.mode==='forward'?'Fw':settings.mode==='reply'?'Re':'新邮件'} 草稿…`);
-      const detail = await chrome.runtime.sendMessage({ type:'NMDA_READ_MESSAGE_DETAIL', summary:eligibility.source });
+      const detail = await sendRuntimeMessage({ type:'NMDA_READ_MESSAGE_DETAIL', summary:eligibility.source });
       if (!detail?.ok) throw new Error(detail?.reason || '无法读取原邮件正文');
       const task = buildFollowUpDraft(contact, eligibility, detail, settings);
       let outcome;
@@ -1475,7 +1506,7 @@
     $('nmda-followup-reply-fields').innerHTML = `<span><b>From</b>${escapeHtml(item.from || email)}</span><span><b>Date</b>${escapeHtml(Contacts.formatDisplayTime(item.receivedAt))}</span>`;
     const attachmentsBox = $('nmda-followup-reply-attachments'); if (attachmentsBox) { attachmentsBox.hidden = true; attachmentsBox.innerHTML = ''; }
     $('nmda-followup-reply-content').textContent = '正在读取邮件正文…';
-    const detail = await chrome.runtime.sendMessage({ type:'NMDA_READ_MESSAGE_DETAIL', summary:{id:item.id, subject:item.subject, receivedAt:item.receivedAt} });
+    const detail = await sendRuntimeMessage({ type:'NMDA_READ_MESSAGE_DETAIL', summary:{id:item.id, subject:item.subject, receivedAt:item.receivedAt} });
     if (!detail?.ok) { $('nmda-followup-reply-content').textContent = `读取失败：${detail?.reason || '未知错误'}`; return; }
     $('nmda-followup-reply-fields').innerHTML = [
       ['From', detail.from || item.from || email], ['To', detail.to || '—'], ['Cc', detail.cc || '—'],
@@ -1590,7 +1621,7 @@
 
   async function saveFormState() {
     if (viewPerf.formSaveTimer) { clearTimeout(viewPerf.formSaveTimer); viewPerf.formSaveTimer = 0; }
-    try { await chrome.storage.local.set({ [STORAGE_KEY]: formState() }); } catch (_) {}
+    try { await storageSet({ [STORAGE_KEY]: formState() }); } catch (_) {}
   }
 
   function queueFormStateSave() {
@@ -1603,7 +1634,7 @@
 
   async function restoreFormState() {
     try {
-      const stored = (await chrome.storage.local.get(STORAGE_KEY))[STORAGE_KEY];
+      const stored = (await storageGet(STORAGE_KEY))[STORAGE_KEY];
       if (!stored) return;
       recipientsEl.value = stored.recipients || ''; subjectEl.value = stored.subject || ''; bodyEl.value = stored.body || '';
       scheduleAtEl.value = stored.scheduleEnabled === false ? '' : (stored.scheduleAt || '');
@@ -1822,7 +1853,7 @@
   (async()=>{
     try{
       if(localStorage.getItem(SCHEDULE_PREFS_KEY))return;
-      const legacy=await chrome.runtime.sendMessage({type:'NMDA_LEGACY_PREFS'});
+      const legacy=await sendRuntimeMessage({type:'NMDA_LEGACY_PREFS'});
       if(legacy?.ok&&legacy.scheduleRules){localStorage.setItem(SCHEDULE_PREFS_KEY,legacy.scheduleRules);batch.scheduleRules=freshScheduleRules();syncScheduleRuleControls();}
     }catch(_){}
   })();
@@ -5423,15 +5454,15 @@
     try{
       // Authenticate before replacing the current import workspace. A failed login check must never erase
       // a batch the user is already reviewing.
-      const connection=await chrome.runtime.sendMessage({type:'NMDA_CONNECTION_STATUS'});
+      const connection=await sendRuntimeMessage({type:'NMDA_CONNECTION_STATUS'});
       if(!connection?.connected||!connection?.authenticated){
-        await chrome.runtime.sendMessage({type:'NMDA_OPEN_MAIL',focus:true}).catch(()=>null);
+        await sendRuntimeMessage({type:'NMDA_OPEN_MAIL',focus:true}).catch(()=>null);
         setImportStatus('请先在网易邮箱完成登录，然后返回工作台再次点击“读取草稿箱”。','warn');
         return;
       }
       token=beginImportSession('正在读取网易草稿箱…');
       setImportStatus('正在读取草稿列表与原生 Compose 数据；无需逐封打开页面，将获取正文、收件人、定时和附件信息。');
-      const result=await chrome.runtime.sendMessage({type:'NMDA_IMPORT_DRAFTS',limit:300});
+      const result=await sendRuntimeMessage({type:'NMDA_IMPORT_DRAFTS',limit:300});
       if(!isCurrentBatchSession(token))return;
       if(!result?.ok)throw new Error(result?.reason||'草稿箱读取失败');
       const dataset=mailboxDraftDataset(result);
@@ -6087,7 +6118,7 @@
       : '正在快速读取最近邮箱变化…');
     try {
       await ensureContactBook();
-      const result = await chrome.runtime.sendMessage({ type: 'NMDA_READ_MAILBOX_STATE', mode: full ? 'full' : 'quick' });
+      const result = await sendRuntimeMessage({ type: 'NMDA_READ_MAILBOX_STATE', mode: full ? 'full' : 'quick' });
       if (!result?.ok) throw new Error(`${result?.phase ? `${result.phase}：` : ''}${result?.reason || '邮箱读取失败'}`);
       const sent = result.sent || {}, drafts = result.drafts || {}, inbox = result.inbox || {};
       const sentMessages = sent.messages || [], draftMessages = drafts.messages || [], inboxMessages = inbox.messages || [];
@@ -6192,7 +6223,7 @@
     const staleScheduled=executable.filter(task=>task.scheduleAt && (Scheduler?.parseLocalDateTime?.(task.scheduleAt)?.getTime()||0) <= Date.now()+60*1000);
     if(staleScheduled.length){setBatchStatus(`有 ${staleScheduled.length} 封邮件的定时时间已过。请先在“安排时间”中更新或清空。`,'error');return;}
     const executableKeys = new Set(executable.map(task => task.editKey)); // freeze this run at start
-    const mailTarget=await chrome.runtime.sendMessage({type:'NMDA_OPEN_MAIL',focus:true});
+    const mailTarget=await sendRuntimeMessage({type:'NMDA_OPEN_MAIL',focus:true});
     if(!mailTarget?.ok){setBatchStatus('无法打开网易邮箱页面，请先完成登录。','error');return;}
     const mailboxReady=await waitForMailboxExecutionReady();
     if(!mailboxReady?.connected || !mailboxReady?.authenticated){
