@@ -1,8 +1,8 @@
 # netease-mail-draft-assistant
 
-NetEase Mail Draft Assistant v3.5.0 - 网易邮箱外联工作台 Chrome 扩展 (MV3)
+NetEase Mail Draft Assistant v3.7.0 - 网易邮箱外联工作台 Chrome 扩展 (MV3)
 
-面向网易邮箱的批量外联邮件发送插件，支持联系人导入、名单管理、发送调度与工作流自动化。
+面向网易邮箱的批量外联邮件发送插件，支持联系人导入、名单管理、发送调度、人工 Follow-up 与工作流自动化。
 
 ## 安装
 
