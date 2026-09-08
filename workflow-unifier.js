@@ -54,10 +54,10 @@
       mode: ['forward','reply','new'].includes(value.mode) ? value.mode : base.mode,
       minDays: Math.max(0, Math.min(365, Number(value.minDays ?? base.minDays) || 0)),
       maxCount: Math.max(0, Math.min(20, Number(value.maxCount ?? base.maxCount) || 0)),
-      blockHumanReply: value.blockHumanReply !== false,
-      blockAutoReply: value.blockAutoReply === true,
-      fwPrefix: String(value.fwPrefix ?? base.fwPrefix).trim() || 'Fw:',
-      rePrefix: String(value.rePrefix ?? base.rePrefix).trim() || 'Re:',
+      blockHumanReply: value.blockHumanReply == null ? !!base.blockHumanReply : value.blockHumanReply !== false,
+      blockAutoReply: value.blockAutoReply == null ? !!base.blockAutoReply : value.blockAutoReply === true,
+      fwPrefix: String(value.fwPrefix ?? base.fwPrefix ?? '').trim(),
+      rePrefix: String(value.rePrefix ?? base.rePrefix ?? '').trim(),
       template: String(value.template ?? base.template)
     };
   }
@@ -75,8 +75,8 @@
       maxCount: $('#nmda-history-max-count')?.value,
       blockHumanReply: $('#nmda-history-block-human')?.checked,
       blockAutoReply: $('#nmda-history-block-auto')?.checked,
-      fwPrefix: state.settings?.fwPrefix || 'Fw:',
-      rePrefix: state.settings?.rePrefix || 'Re:',
+      fwPrefix: state.settings?.fwPrefix,
+      rePrefix: state.settings?.rePrefix,
       template: $('#nmda-history-template')?.value ?? state.settings?.template
     });
     await storageSet({ [SETTINGS_KEY]: state.settings });
