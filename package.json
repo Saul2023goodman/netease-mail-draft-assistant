@@ -1,0 +1,12 @@
+{
+  "name": "netease-mail-draft-assistant",
+  "version": "3.7.0",
+  "private": true,
+  "description": "Railway static host for the NetEase Mail Draft Assistant workspace UI",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
