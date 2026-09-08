@@ -1,0 +1,44 @@
+name: Finish V5 Workbench Rewrite
+
+on:
+  push:
+    branches:
+      - release/workbench-flow-5.0
+
+permissions:
+  contents: write
+
+jobs:
+  finish:
+    if: ${{ github.actor != 'github-actions[bot]' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: release/workbench-flow-5.0
+      - name: Remove all page-level N icon markup and isolate contact evidence click
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('app.js')
+          text = p.read_text(encoding='utf-8')
+          old_brand = '<div class="nmda-brand"><span class="nmda-brand-mark">N</span><div><strong>网易邮箱外联工作台</strong><small>导入 → 核验 → 排期 → 创建草稿</small></div></div>'
+          new_brand = '<div class="nmda-brand"><div><strong>网易邮箱外联工作台</strong><small>导入 → 核验 → 排期 → 创建草稿</small></div></div>'
+          old_click = "list.querySelectorAll('[data-task-open]').forEach(button=>button.addEventListener('click',()=>openEditor(button.dataset.taskOpen)));"
+          new_click = "list.querySelectorAll('[data-task-open]').forEach(button=>button.addEventListener('click',event=>{if(event.target.closest?.('.nmda-recipient-cell'))return;openEditor(button.dataset.taskOpen);}));"
+          if old_brand not in text or old_click not in text:
+              raise SystemExit('expected v5 shell markers not found')
+          text = text.replace(old_brand, new_brand, 1).replace(old_click, new_click, 1)
+          p.write_text(text, encoding='utf-8')
+          PY
+          rm .github/workflows/v5-finish.yml
+      - name: Commit final source tree
+        shell: bash
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add app.js .github/workflows/v5-finish.yml
+          git commit -m "fix: remove remaining page icon markup and finish v5 shell"
+          git push origin HEAD:release/workbench-flow-5.0
