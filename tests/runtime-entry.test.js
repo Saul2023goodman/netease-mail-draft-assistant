@@ -45,3 +45,12 @@ test('standalone bootstrap compatibility globals are created before app.js', () 
   assert.ok(context.NMDAPreferences);
   assert.ok(context.NMDAPolicyProfile);
 });
+
+test('removing the optional review surface cannot abort app bootstrap', () => {
+  const app = fs.readFileSync(path.join(ROOT, 'app.js'), 'utf8');
+  assert.equal(app.includes("ui.querySelector('#nmda-panel')?.appendChild(reviewPortal);"), false);
+  assert.match(app, /const reviewHost=ui\.querySelector\('#nmda-panel'\);/);
+  assert.match(app, /if\(reviewPortal && reviewHost\) reviewHost\.appendChild\(reviewPortal\);/);
+  assert.match(app, /panel\.hidden = false;/);
+  assert.match(app, /launcher\.hidden = true;/);
+});
