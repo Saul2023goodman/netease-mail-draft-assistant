@@ -3,7 +3,7 @@ name: Temporary App Source Patch
 on:
   push:
     branches:
-      - hotfix/app-blank-4.1.1
+      - release/hotfix-app-4.1.1
 
 permissions:
   contents: write
@@ -16,7 +16,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: hotfix/app-blank-4.1.1
+          ref: release/hotfix-app-4.1.1
       - name: Patch unsafe review portal bootstrap
         shell: bash
         run: |
@@ -38,4 +38,4 @@ jobs:
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           git add app.js
           git commit -m "fix: tolerate removed review surface [hotfix-patched]"
-          git push origin HEAD:hotfix/app-blank-4.1.1
+          git push origin HEAD:release/hotfix-app-4.1.1
