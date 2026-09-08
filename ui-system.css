@@ -481,41 +481,13 @@ html.nmda-app-document body.nmda-app-body {
 .nmda-create-stage .nmda-run-controls .nmda-btn { min-width:118px; }
 
 /* ---------- single draft: no outer scroll ---------- */
-[data-pane="single"].nmda-page { overflow:hidden !important; }
-.nmda-single-grid {
-  height:100%;
-  min-height:0;
-  grid-template-columns:minmax(0,1.75fr) minmax(300px,.72fr);
-  gap:14px;
-}
 .nmda-compose-card { min-height:0; grid-template-rows:auto auto auto minmax(0,1fr); padding:15px; }
 .nmda-grow-field { min-height:0; }
 #nmda-body-text { height:100%; min-height:180px !important; resize:none; overflow:auto; font-size:12.5px; line-height:1.7; }
 .nmda-side-stack { min-height:0; gap:10px; }
-.nmda-single-options-card { gap:10px; }
 .nmda-action-card { position:static !important; }
 
 /* ---------- contacts: table owns scrolling ---------- */
-[data-pane="contacts"].nmda-page {
-  display:grid;
-  grid-template-rows:auto minmax(0,1fr);
-  gap:10px;
-  overflow:hidden !important;
-}
-.nmda-crm-top-grid { margin:0; }
-.nmda-contact-command-card { padding:12px 14px; }
-.nmda-contact-sync-line { grid-template-columns:minmax(180px,.75fr) minmax(260px,1.25fr); }
-.nmda-contact-sync-line .nmda-read-meta,#nmda-contact-status { min-height:34px; font-size:10.5px; }
-.nmda-contact-list-card {
-  height:100%;
-  min-height:0 !important;
-  grid-template-rows:auto auto auto minmax(0,1fr);
-  padding:14px;
-}
-.nmda-contact-toolbar-unified { grid-template-columns:minmax(220px,1fr) minmax(220px,.8fr); }
-.nmda-contact-toolbar-unified input { min-height:40px !important; height:40px !important; font-size:12px !important; }
-.nmda-contact-table-wrap { min-height:0 !important; max-height:none !important; height:100%; overflow:auto !important; }
-.nmda-contact-table { min-width:860px; }
 
 /* ---------- file-purpose modal: one viewport-bounded workspace ---------- */
 #nmda-root.nmda-standalone .nmda-supplement-preflight,
@@ -621,7 +593,6 @@ html.nmda-app-document body.nmda-app-body {
   .nmda-source-action-grid { grid-template-columns:repeat(3,minmax(0,1fr)) !important; }
   .nmda-source-action small { display:none; }
   .nmda-source-action { min-height:68px !important; }
-  .nmda-single-grid { grid-template-columns:minmax(0,1fr) 280px; }
   .nmda-classify-workspace { grid-template-columns:150px minmax(300px,1fr) 270px !important; }
   .nmda-classify-head-summary { display:none; }
 }
@@ -657,10 +628,8 @@ html.nmda-app-document body.nmda-app-body {
   .nmda-create-stage { grid-template-columns:1fr !important; gap:8px !important; }
   .nmda-create-stage .nmda-run-controls { width:100%; }
   .nmda-create-stage .nmda-run-controls .nmda-btn { flex:1; }
-  .nmda-single-grid { grid-template-columns:1fr; overflow-y:auto; }
   .nmda-compose-card { min-height:520px; }
   .nmda-action-card { margin-bottom:8px; }
-  .nmda-contact-sync-line,.nmda-contact-toolbar-unified { grid-template-columns:1fr; }
   .nmda-classify-dialog { width:calc(100vw - 16px) !important; height:calc(100dvh - 16px) !important; max-height:calc(100dvh - 16px) !important; }
   #nmda-root.nmda-standalone .nmda-supplement-preflight { padding:8px !important; }
   .nmda-classify-workspace { grid-template-columns:128px minmax(280px,1fr) !important; }
@@ -776,15 +745,10 @@ html.nmda-app-document body.nmda-app-body {
 
 /* Single-draft stays a two-pane task on compact windows; do not turn it into a long page. */
 @media (max-width:820px) {
-  .nmda-single-grid {
-    grid-template-columns:minmax(0,1fr) minmax(220px,250px) !important;
-    gap:10px !important;
-    overflow:hidden !important;
-  }
   .nmda-compose-card { min-height:0 !important; }
   .nmda-side-stack { min-height:0 !important; overflow:hidden !important; }
-  .nmda-single-options-card,.nmda-action-card { padding:11px !important; }
-  .nmda-single-options-card .nmda-card-desc,.nmda-action-card .nmda-card-desc { display:none; }
+  .nmda-action-card { padding:11px !important; }
+  .nmda-action-card .nmda-card-desc { display:none; }
 }
 
 /* On minimum width, planning becomes one intentional scrollable stage.

@@ -1,7 +1,3 @@
-/* NetEase Mail Draft Assistant v2.4 — browse first, edit in task dialogs.
-   Main canvases maximize list visibility. Complex review / scheduling / contact editing
-   move to focused modal workspaces that return the user to the previous context. */
-
 #nmda-root [hidden] { display:none !important; }
 
 /* ---------- Stage 3: schedule overview, not a permanent settings form ---------- */
@@ -104,7 +100,7 @@
 #nmda-root.nmda-standalone #nmda-preview-card .nmda-batch-table td:nth-child(5) { width:110px; }
 #nmda-root.nmda-standalone #nmda-preview-card .nmda-batch-table th:nth-child(6),
 #nmda-root.nmda-standalone #nmda-preview-card .nmda-batch-table td:nth-child(6) { width:62px; text-align:right; }
-.nmda-row-action,.nmda-contact-open {
+.nmda-row-action {
   min-height:28px;
   padding:0 8px;
   border:1px solid #c9d6e5;
@@ -114,7 +110,7 @@
   font:700 10.5px/1 var(--nmda-font);
   cursor:pointer;
 }
-.nmda-row-action:hover,.nmda-contact-open:hover { border-color:#8cb9f4; background:#f5f9ff; }
+.nmda-row-action:hover { border-color:#8cb9f4; background:#f5f9ff; }
 #nmda-root.nmda-standalone .nmda-planning-modebar { display:none !important; }
 
 /* ---------- Shared focused task dialogs ---------- */
@@ -292,112 +288,9 @@
 }
 #nmda-root.nmda-standalone .nmda-inline-review .nmda-review-edit-scroll { min-height:0 !important; overflow:auto !important; padding-bottom:12px; }
 #nmda-root.nmda-standalone .nmda-inline-review .nmda-review-core-fields textarea { min-height:220px !important; resize:vertical; }
-
-/* ---------- Contacts: browse many rows, open one person for edits/history ---------- */
-#nmda-root.nmda-standalone [data-pane="contacts"].nmda-page:not([hidden]) {
-  display:grid !important;
-  grid-template-rows:auto minmax(0,1fr) !important;
-  gap:8px !important;
-  overflow:hidden !important;
-}
-.nmda-contact-command-strip {
-  min-width:0;
-  min-height:48px;
-  display:grid;
-  grid-template-columns:minmax(240px,1fr) minmax(220px,1.4fr) auto;
-  align-items:center;
-  gap:10px;
-  padding:7px 10px;
-  border:1px solid #dfe5ec;
-  border-radius:11px;
-  background:#fff;
-  box-shadow:0 1px 2px rgba(16,24,40,.04);
-}
-.nmda-contact-sync-state { min-width:0; display:flex; align-items:center; gap:8px; }
-.nmda-contact-sync-dot { width:8px; height:8px; flex:0 0 auto; border-radius:50%; background:#21a65b; box-shadow:0 0 0 4px #eaf8ef; }
-.nmda-contact-sync-state > div { min-width:0; display:flex; align-items:baseline; gap:8px; }
-.nmda-contact-sync-state strong { font-size:11.5px; white-space:nowrap; }
-.nmda-contact-sync-state .nmda-read-meta { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:#667085; font-size:10.5px; }
-.nmda-contact-status-inline { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:#16834a; font-size:10.5px; }
-.nmda-contact-command-actions { display:flex; align-items:center; gap:6px; }
-.nmda-contact-maintenance-menu { position:relative; }
-.nmda-contact-maintenance-menu > summary { list-style:none; min-height:34px; display:grid; place-items:center; padding:0 10px; border:1px solid #c8d1dc; border-radius:8px; color:#475467; font-size:11px; font-weight:680; cursor:pointer; }
-.nmda-contact-maintenance-menu > summary::-webkit-details-marker { display:none; }
-.nmda-contact-maintenance-menu[open] > .nmda-btn { position:absolute; right:0; top:39px; z-index:6; min-width:150px; box-shadow:0 10px 28px rgba(16,24,40,.15); background:#fff; }
-#nmda-root.nmda-standalone .nmda-contact-browser-card {
-  min-height:0 !important;
-  height:100% !important;
-  display:grid !important;
-  grid-template-rows:auto auto auto minmax(0,1fr) !important;
-  gap:8px !important;
-  padding:12px !important;
-  overflow:hidden !important;
-}
-.nmda-contact-browser-head { min-height:40px; align-items:center; }
-#nmda-root.nmda-standalone .nmda-contact-toolbar-unified { display:grid !important; grid-template-columns:minmax(260px,1.2fr) minmax(220px,.8fr) !important; gap:8px !important; }
-.nmda-contact-searchbox { position:relative; min-width:0; }
-.nmda-contact-searchbox > span { position:absolute; left:10px; top:50%; transform:translateY(-50%); z-index:1; color:#98a2b3; font-size:14px; }
-#nmda-root.nmda-standalone .nmda-contact-searchbox input { width:100%; padding-left:30px !important; }
-#nmda-root.nmda-standalone .nmda-contact-table-wrap {
-  min-height:0 !important;
-  height:100% !important;
-  overflow:auto !important;
-  overscroll-behavior:contain;
-  scrollbar-gutter:stable;
-}
-#nmda-root.nmda-standalone .nmda-contact-table {
-  width:100% !important;
-  min-width:0 !important;
-  table-layout:fixed !important;
-}
-#nmda-root.nmda-standalone .nmda-contact-table th,
-#nmda-root.nmda-standalone .nmda-contact-table td { padding:7px 9px !important; vertical-align:middle !important; }
-#nmda-root.nmda-standalone .nmda-contact-table th:nth-child(1),
-#nmda-root.nmda-standalone .nmda-contact-table td:nth-child(1) { width:24% !important; }
-#nmda-root.nmda-standalone .nmda-contact-table th:nth-child(2),
-#nmda-root.nmda-standalone .nmda-contact-table td:nth-child(2) { width:27% !important; }
-#nmda-root.nmda-standalone .nmda-contact-table th:nth-child(3),
-#nmda-root.nmda-standalone .nmda-contact-table td:nth-child(3) { width:auto !important; }
-#nmda-root.nmda-standalone .nmda-contact-table th:nth-child(4),
-#nmda-root.nmda-standalone .nmda-contact-table td:nth-child(4),
-#nmda-root.nmda-standalone .nmda-contact-table th:nth-child(5),
-#nmda-root.nmda-standalone .nmda-contact-table td:nth-child(5) { width:64px !important; text-align:center; }
-#nmda-root.nmda-standalone .nmda-contact-table th:nth-child(6),
-#nmda-root.nmda-standalone .nmda-contact-table td:nth-child(6) { width:60px !important; text-align:right; }
-.nmda-contact-identity-cell strong,.nmda-contact-identity-cell small,.nmda-contact-activity-cell strong,.nmda-contact-activity-cell small { display:block; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.nmda-contact-identity-cell strong { font-size:11.5px; }
-.nmda-contact-identity-cell small,.nmda-contact-activity-cell small { margin-top:2px; color:#7a8798; font-size:9.5px; }
-.nmda-contact-activity-cell strong { color:#475467; font-size:10.5px; font-weight:680; }
-.nmda-contact-status-chips { display:flex !important; flex-wrap:nowrap !important; gap:4px !important; overflow:hidden; }
-.nmda-contact-status-chips .nmda-class-chip { flex:0 0 auto; }
-.nmda-contact-count-cell { font-weight:720; color:#344054; }
 .nmda-empty-table-cell { height:100px; text-align:center; color:#667085; }
 
 /* Contact detail editor */
-.nmda-contact-dialog { width:min(1000px,calc(100vw - 28px)); height:min(700px,calc(100dvh - 28px)); }
-.nmda-contact-dialog-body { min-height:0; display:grid; grid-template-columns:minmax(280px,.78fr) minmax(0,1.22fr); overflow:hidden; }
-.nmda-contact-profile-panel { min-height:0; padding:14px; overflow:auto; border-right:1px solid #e2e8f0; background:#fbfcfe; }
-.nmda-contact-profile-summary { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
-.nmda-contact-profile-summary > div { min-width:0; min-height:62px; display:flex; flex-direction:column; justify-content:center; padding:8px 10px; border:1px solid #e2e8f0; border-radius:9px; background:#fff; }
-.nmda-contact-profile-summary strong { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:#182230; font-size:12px; }
-.nmda-contact-profile-summary span { margin-top:3px; color:#7a8798; font-size:9.5px; }
-.nmda-contact-editor-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:12px; }
-.nmda-contact-editor-grid .nmda-check-card { min-height:58px; align-self:end; }
-.nmda-contact-modal-tags { grid-column:1 / -1; }
-.nmda-contact-history-panel { min-height:0; display:grid; grid-template-rows:auto minmax(0,1fr); padding:14px; overflow:hidden; }
-.nmda-contact-history-head { min-height:36px; display:flex; align-items:center; justify-content:space-between; gap:10px; }
-.nmda-contact-history-head strong { font-size:12px; }
-.nmda-contact-history-head span { color:#667085; font-size:10px; }
-.nmda-contact-history-columns { min-height:0; display:grid; grid-template-columns:1fr 1fr; gap:10px; overflow:hidden; }
-.nmda-contact-history-columns > div { min-height:0; display:grid; grid-template-rows:auto minmax(0,1fr); overflow:hidden; }
-.nmda-contact-history-columns h4 { margin:0 0 6px; color:#475467; font-size:10.5px; }
-.nmda-contact-history-list { min-height:0; overflow:auto; border:1px solid #e2e8f0; border-radius:9px; background:#fff; }
-.nmda-contact-history-item { padding:9px 10px; border-bottom:1px solid #edf1f5; }
-.nmda-contact-history-item:last-child { border-bottom:0; }
-.nmda-contact-history-item strong,.nmda-contact-history-item small { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.nmda-contact-history-item strong { color:#344054; font-size:10.5px; }
-.nmda-contact-history-item small { margin-top:3px; color:#7a8798; font-size:9.5px; }
-.nmda-contact-history-empty { display:grid; place-items:center; min-height:100px; color:#98a2b3; font-size:10.5px; }
 
 @media (max-width:900px) {
   #nmda-root.nmda-standalone #nmda-preview-card > .nmda-planning-head { gap:8px !important; }
@@ -413,25 +306,8 @@
   #nmda-root.nmda-standalone #nmda-preview-card .nmda-batch-table th:nth-child(5),
   #nmda-root.nmda-standalone #nmda-preview-card .nmda-batch-table td:nth-child(5) { width:auto; }
 
-  .nmda-contact-command-strip { grid-template-columns:minmax(0,1fr) auto; }
-  .nmda-contact-status-inline { display:none; }
-  .nmda-contact-sync-state > div { display:block; }
-  .nmda-contact-sync-state .nmda-read-meta { display:block; max-width:360px; }
-  #nmda-root.nmda-standalone .nmda-contact-toolbar-unified { grid-template-columns:minmax(0,1fr) minmax(180px,.7fr) !important; }
-  #nmda-root.nmda-standalone .nmda-contact-table th:nth-child(4),
-  #nmda-root.nmda-standalone .nmda-contact-table td:nth-child(4),
-  #nmda-root.nmda-standalone .nmda-contact-table th:nth-child(5),
-  #nmda-root.nmda-standalone .nmda-contact-table td:nth-child(5) { display:none; }
-  #nmda-root.nmda-standalone .nmda-contact-table th:nth-child(1),
-  #nmda-root.nmda-standalone .nmda-contact-table td:nth-child(1) { width:30% !important; }
-  #nmda-root.nmda-standalone .nmda-contact-table th:nth-child(2),
-  #nmda-root.nmda-standalone .nmda-contact-table td:nth-child(2) { width:28% !important; }
-  #nmda-root.nmda-standalone .nmda-contact-table th:nth-child(6),
-  #nmda-root.nmda-standalone .nmda-contact-table td:nth-child(6) { width:58px !important; }
-
   #nmda-root.nmda-standalone .nmda-inline-review .nmda-review-layout { grid-template-columns:205px minmax(0,1fr) !important; }
   #nmda-root.nmda-standalone .nmda-inline-review { inset:8px !important; }
-  .nmda-contact-dialog-body { grid-template-columns:260px minmax(0,1fr); }
 }
 
 @media (max-width:720px) {
@@ -443,18 +319,6 @@
   #nmda-root.nmda-standalone #nmda-preview-card .nmda-batch-table td:nth-child(2) { width:38%; }
   #nmda-root.nmda-standalone #nmda-preview-card .nmda-batch-table th:nth-child(4),
   #nmda-root.nmda-standalone #nmda-preview-card .nmda-batch-table td:nth-child(4) { width:auto; }
-  .nmda-contact-command-strip { grid-template-columns:minmax(0,1fr) auto; padding:6px 8px; }
-  .nmda-contact-command-actions #nmda-export-contacts,.nmda-contact-maintenance-menu { display:none; }
-  #nmda-root.nmda-standalone .nmda-contact-toolbar-unified { grid-template-columns:1fr !important; }
-  #nmda-root.nmda-standalone #nmda-contact-class-filter { display:none; }
-  #nmda-root.nmda-standalone .nmda-contact-table th:nth-child(2),
-  #nmda-root.nmda-standalone .nmda-contact-table td:nth-child(2) { display:none; }
-  #nmda-root.nmda-standalone .nmda-contact-table th:nth-child(1),
-  #nmda-root.nmda-standalone .nmda-contact-table td:nth-child(1) { width:42% !important; }
-  .nmda-contact-dialog { height:calc(100dvh - 16px); }
-  .nmda-contact-dialog-body { grid-template-columns:1fr; overflow:auto; }
-  .nmda-contact-profile-panel { border-right:0; border-bottom:1px solid #e2e8f0; overflow:visible; }
-  .nmda-contact-history-panel { min-height:360px; overflow:visible; }
   .nmda-schedule-dialog { width:calc(100vw - 16px); }
   #nmda-root.nmda-standalone .nmda-schedule-dialog .nmda-scheduler-grid { grid-template-columns:1fr !important; }
   #nmda-root.nmda-standalone .nmda-schedule-dialog .nmda-schedule-wide-check { grid-column:auto; }
@@ -471,10 +335,6 @@
   #nmda-root.nmda-standalone .nmda-inline-review:not([hidden]) { inset:7px !important; }
   #nmda-root.nmda-standalone .nmda-inline-review-top { min-height:52px; padding:7px 10px !important; }
   #nmda-root.nmda-standalone .nmda-inline-review-top .nmda-card-desc { display:none; }
-  .nmda-contact-command-strip { min-height:42px; padding-top:4px; padding-bottom:4px; }
-  #nmda-root.nmda-standalone .nmda-contact-browser-card { padding:9px !important; gap:6px !important; }
-  .nmda-contact-browser-head { min-height:34px; }
-  #nmda-root.nmda-standalone .nmda-contact-toolbar-unified input { min-height:34px !important; height:34px !important; }
 }
 
 /* Use the review canvas fully: the message body grows with the dialog instead of
@@ -504,13 +364,6 @@
   height:100% !important;
   resize:none !important;
   overflow:auto !important;
-}
-.nmda-contact-maintenance-menu:not([open]) > #nmda-rebuild-history { display:none !important; }
-.nmda-contact-maintenance-menu[open] > #nmda-rebuild-history {
-  left:auto !important;
-  right:0 !important;
-  transform:none !important;
-  margin:0 !important;
 }
 
 /* ========================================================================== */

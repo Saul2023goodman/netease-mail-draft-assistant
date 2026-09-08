@@ -155,16 +155,19 @@
   }
 
   async function syncThroughExistingMailboxReader() {
-    const syncButton = $('#nmda-followup-sync') || $('#nmda-refresh-history');
-    if (!syncButton) throw new Error('邮箱同步入口尚未就绪。');
     const connection = await send({ type:'NMDA_CONNECTION_STATUS' });
     if (!connection?.connected || !connection?.authenticated) throw new Error('请先连接并登录网易邮箱。');
-    syncButton.click();
-    const started = Date.now();
-    while (!syncButton.disabled && Date.now() - started < 1500) await sleep(40);
-    while (syncButton.disabled && Date.now() - started < 90000) await sleep(120);
-    if (syncButton.disabled) throw new Error('邮箱同步未正常结束。');
-    await loadContacts();
+    state.account = await detectAccount();
+    state.contacts = Contacts ? await Contacts.load(state.account) : {};
+    const result = await send({ type:'NMDA_READ_MAILBOX_STATE', mode:'quick' });
+    if(!result?.ok)throw new Error(result?.reason || '邮箱读取失败');
+    const next=Contacts.cloneContacts(state.contacts);
+    Contacts.applySentMessages(next,result.sent?.messages||[]);
+    Contacts.applyDraftMessages(next,result.drafts?.messages||[],{replaceActive:result.drafts?.complete===true});
+    Contacts.applyInboxMessages(next,result.inbox?.messages||[]);
+    await Contacts.save(state.account,next);
+    state.contacts=next;
+    return next;
   }
 
   async function loadRegistry() {
@@ -221,7 +224,7 @@
     const summary = $('#nmda-history-summary');
     if (!body || !summary) return;
     const query = String($('#nmda-history-search')?.value || '').trim().toLowerCase();
-    const filter = $('#nmda-history-filter')?.value || 'eligible';
+    const filter = 'eligible';
     state.search = query;
     state.filter = filter;
     const registry = await loadRegistry();
@@ -279,13 +282,12 @@
     overlay.innerHTML = `
       <section class="nmda-workflow-dialog nmda-history-dialog" role="dialog" aria-modal="true" aria-labelledby="nmda-history-title">
         <header class="nmda-workflow-dialog-head">
-          <div><span class="nmda-dialog-eyebrow">导入来源</span><h3 id="nmda-history-title">从历史邮件导入</h3><p>Follow-up 不再单独运行：选择原邮件后，先进入普通任务核验与排期，执行时自动使用网易原生 Fw / Re。</p></div>
+          <div><span class="nmda-dialog-eyebrow">导入来源</span><h3 id="nmda-history-title">处理待跟进邮件</h3><p>这里只显示当前规则判断为需要处理的历史邮件；导入后与普通任务走同一套核验、排期与执行流程。</p></div>
           <button class="nmda-dialog-close" id="nmda-history-close" type="button" aria-label="关闭">×</button>
         </header>
         <div class="nmda-history-body-wrap">
           <div class="nmda-history-toolbar">
             <label class="nmda-history-search"><span>⌕</span><input id="nmda-history-search" type="search" placeholder="搜索联系人或原主题"></label>
-            <select id="nmda-history-filter"><option value="eligible">可导入</option><option value="sent">全部已发送</option><option value="human">有真人回复</option><option value="auto">有 Auto Reply</option><option value="pending">已导入待执行</option></select>
             <button class="nmda-btn nmda-btn-small" id="nmda-history-sync" type="button">同步邮箱</button>
           </div>
           <div class="nmda-history-rulebar">
@@ -308,7 +310,6 @@
     $('#nmda-history-cancel')?.addEventListener('click', close);
     overlay.addEventListener('click', event => { if (event.target === overlay) close(); });
     $('#nmda-history-search')?.addEventListener('input', () => renderCandidates().catch(()=>{}));
-    $('#nmda-history-filter')?.addEventListener('change', () => renderCandidates().catch(()=>{}));
     $('#nmda-history-body')?.addEventListener('change', event => {
       const input = event.target.closest?.('[data-history-select]');
       if (!input) return;
@@ -351,7 +352,7 @@
       syncSettingControls();
       state.selected.clear();
       await renderCandidates();
-      setStatus('选择需要跟进的原邮件，然后导入到当前任务。', 'ok');
+      setStatus('选择需要处理的原邮件，然后加入当前任务。', 'ok');
     } catch (error) {
       setStatus(error.message, 'error');
     }
@@ -447,7 +448,7 @@
     await appendRegistry(good.map(item => item.registry));
     const input = $('#nmda-import-file');
     if (!input) throw new Error('当前批次导入器尚未就绪。');
-    const file = new File([JSON.stringify(good.map(item => item.task), null, 2)], `follow-up-history-${Date.now()}.json`, { type:'application/json' });
+    const file = new File([JSON.stringify(good.map(item => item.task), null, 2)], `history-task-${Date.now()}.json`, { type:'application/json' });
     const transfer = new DataTransfer();
     transfer.items.add(file);
     input.files = transfer.files;
@@ -458,29 +459,43 @@
     updateSelectedCount();
     const modal = $('#nmda-history-import-modal');
     if (modal) modal.hidden = true;
-    const note = failed.length ? `；${failed.length} 封读取失败，可重新打开历史邮件导入重试` : '';
+    await refreshPendingEntry();
+    const note = failed.length ? `；${failed.length} 封读取失败，可重新打开待处理列表重试` : '';
     const importStatus = $('#nmda-import-status');
     if (importStatus) {
-      importStatus.textContent = `已把 ${good.length} 封历史邮件加入当前批次${note}。请按普通邮件完成核验与排期。`;
+      importStatus.textContent = `已把 ${good.length} 封历史邮件加入当前批次${note}。已进入统一任务流程。`;
       importStatus.dataset.kind = failed.length ? 'warn' : 'ok';
     }
   }
 
-  function installImportEntry() {
-    const grid = $('.nmda-source-action-grid');
-    if (!grid || $('#nmda-import-history')) return;
-    const button = document.createElement('button');
-    button.id = 'nmda-import-history';
-    button.type = 'button';
-    button.className = 'nmda-source-action nmda-source-action-button nmda-source-action-history';
-    button.innerHTML = '<span class="nmda-source-action-icon">↻</span><strong>历史邮件</strong><small>从已发送 / 回复导入跟进任务</small>';
-    grid.appendChild(button);
-    button.addEventListener('click', () => openModal().catch(error => console.warn('[NMDA] history import failed', error)));
+  function eligiblePendingCount() {
+    return Object.values(state.contacts || {}).filter(raw => Number(raw?.sentCount || 0) && eligibility(raw).eligible).length;
+  }
 
-    const note = document.createElement('div');
-    note.className = 'nmda-history-import-principle';
-    note.innerHTML = '<strong>统一导入</strong><span>初次外联、草稿箱和 Follow-up 都先导入为任务；只有执行动作不同。</span>';
-    grid.insertAdjacentElement('afterend', note);
+  async function refreshPendingEntry() {
+    const button=$('#nmda-history-pending');
+    if(!button)return;
+    try{
+      await Promise.all([loadSettings(),loadContacts()]);
+      const count=eligiblePendingCount();
+      button.hidden=count===0;
+      button.textContent=count?`待处理 ${count}`:'待处理';
+    }catch(_){button.hidden=true;}
+  }
+
+  function installImportEntry() {
+    const actions = $('#nmda-import-card .nmda-card-head .nmda-row');
+    if (!actions || $('#nmda-history-pending')) return;
+    const button = document.createElement('button');
+    button.id = 'nmda-history-pending';
+    button.type = 'button';
+    button.className = 'nmda-btn nmda-btn-small nmda-btn-quiet';
+    button.hidden = true;
+    button.textContent = '待处理';
+    actions.insertBefore(button, actions.firstChild);
+    button.addEventListener('click', () => openModal().catch(error => console.warn('[NMDA] history pending failed', error)));
+    setTimeout(()=>refreshPendingEntry(),500);
+    window.addEventListener('focus',()=>refreshPendingEntry().catch(()=>{}));
   }
 
 

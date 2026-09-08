@@ -4,7 +4,13 @@ Chrome MV3 workbench for preparing NetEase 163 mail drafts.
 
 ## Runtime model
 
-Files, mailbox drafts, and historical mail enter one task pipeline: import → inspect → plan → create draft. Native NetEase Forward/Reply remains an execution mode for tasks imported from historical mail.
+All outreach enters one task workbench. A single message and a large batch use the same task pipeline: source import → automatic recognition → exception review when needed → scheduling → draft execution.
+
+Files, folders, pasted content, mailbox drafts, rosters, attachments, and eligible historical mail are sources. The importer determines their role. A roster is evidence for identity, duplicate checks, and scheduling; it is not a separate workflow. Sources that can be classified safely continue automatically, while only ambiguous sources interrupt the user.
+
+Contacts are an evidence store rather than a top-level workbench. Sent, draft, and reply state comes from mailbox facts. The user-facing contact control is policy: allow contact, pause, or permanently stop. Contact facts and recent history are opened contextually from a recipient in the task list.
+
+Historical follow-up is pending work, not a separate module. Only messages that currently satisfy the follow-up policy appear in Pending; importing one creates an ordinary task whose execution mode can preserve native NetEase Forward/Reply behavior.
 
 Automation defaults are allowed, but they are isolated from core business logic. `default-policy.js` is the single source for product-level defaults; `policy-profile.js` adds user overrides and learned identity relationships; engines only execute the resolved policy.
 

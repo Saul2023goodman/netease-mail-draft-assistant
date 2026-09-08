@@ -1,9 +1,4 @@
-/* Follow-up is an import source, not a top-level workspace. */
-#nmda-root [data-tab="followup"],
-#nmda-root [data-page-head="followup"],
-#nmda-root [data-pane="followup"] { display:none !important; }
 #nmda-root .nmda-class-chip[data-class-kind="followup"] { display:none !important; }
-#nmda-root .nmda-contact-editor-grid label:has(#nmda-contact-modal-followup) { display:none !important; }
 
 #nmda-root .nmda-source-action-history { border-style:solid; }
 #nmda-root .nmda-history-import-principle {

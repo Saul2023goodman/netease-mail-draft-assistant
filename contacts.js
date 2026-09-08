@@ -88,6 +88,13 @@
     return base;
   }
 
+  function interactionState(contact = {}) {
+    const human = Number(contact.humanReplyCount || 0) || (Array.isArray(contact.replyHistory) ? contact.replyHistory.filter(item => item && !item.autoReply).length : 0);
+    if (human > 0) return '已回复';
+    if (Number(contact.sentCount || 0) > 0 || contact.knownSentAt) return '已发送';
+    return '未联系';
+  }
+
   function normalizeContactShape(contact, email = '') {
     if (!contact || typeof contact !== 'object') contact = {};
     const legacy = legacyDimensions(contact.status, contact.sentCount);
@@ -123,7 +130,9 @@
     // to correct stale/incorrect pre-v1.7 mailbox-derived data.
     contact.knownSentAt = contact.knownSentAt || '';
     contact.mailboxSnapshotAt = contact.mailboxSnapshotAt || '';
-    // Keep a backward-compatible shadow value. New code never uses it as the full workflow state.
+    // Interaction state is derived from mailbox evidence; legacy stage remains migration input only.
+    contact.stage = interactionState(contact);
+    contact.stageSource = contact.stage === '未联系' ? 'default' : 'mailbox';
     contact.status = contact.stage;
     return contact;
   }
@@ -678,11 +687,10 @@
 
   function classificationItems(contact) {
     contact = normalizeContactShape(contact || {});
-    const items = [{ kind: 'stage', value: contact.stage || '未联系' }];
-    if (contact.followUp) items.push({ kind: 'followup', value: '待跟进' });
-    if (contact.policy && contact.policy !== '正常') items.push({ kind: 'policy', value: contact.policy });
-    if (Number(contact.draftCount || 0) > 0) items.push({ kind: 'draft', value: '有草稿' });
-    for (const tag of parseContactTags(contact.tags || [])) items.push({ kind: 'tag', value: tag });
+    const items = [{ kind:'stage', value:interactionState(contact) }];
+    if (contact.policy && contact.policy !== '正常') items.push({ kind:'policy', value:contact.policy });
+    if (Number(contact.draftCount || 0) > 0) items.push({ kind:'draft', value:'有草稿' });
+    for (const tag of parseContactTags(contact.tags || [])) items.push({ kind:'tag', value:tag });
     return items;
   }
 
@@ -728,6 +736,7 @@
     mergeContactTags,
     parseRecipients,
     normalizeContactShape,
+    interactionState,
     load,
     save,
     loadSyncMeta,
