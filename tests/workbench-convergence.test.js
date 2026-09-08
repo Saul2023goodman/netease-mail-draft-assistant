@@ -5,8 +5,9 @@ const vm = require('node:vm');
 
 const app = fs.readFileSync('app.js', 'utf8');
 const contacts = fs.readFileSync('contacts.js', 'utf8');
-const historyImport = fs.readFileSync('workflow-unifier.js', 'utf8');
+const historySource = fs.readFileSync('history-source.js', 'utf8');
 const html = fs.readFileSync('app.html', 'utf8');
+const architecture = fs.readFileSync('ARCHITECTURE.md', 'utf8');
 
 test('one task workbench owns the front-end', () => {
   for (const token of [
@@ -35,12 +36,29 @@ test('source review is exception driven and confidence is not UI copy', () => {
   assert.equal(app.includes('基本确定'), false);
 });
 
-test('history follow-up is pending work, not a standalone import module', () => {
-  assert.match(historyImport, /id = 'nmda-history-pending'/);
-  assert.match(historyImport, /const filter = 'eligible'/);
-  assert.match(historyImport, /NMDA_READ_MAILBOX_STATE/);
-  assert.equal(historyImport.includes('nmda-import-history'), false);
-  assert.equal(historyImport.includes('nmda-source-action-history'), false);
+test('historical mail is a secondary source, not a follow-up workspace', () => {
+  assert.match(historySource, /id = 'nmda-history-source'/);
+  assert.match(historySource, /从历史邮件创建任务/);
+  assert.match(historySource, /class="nmda-history-advanced"/);
+  assert.match(historySource, /NMDA_READ_MAILBOX_STATE/);
+  assert.equal(historySource.includes('处理待跟进邮件'), false);
+  assert.equal(historySource.includes('nmda-source-action-history'), false);
+  assert.equal(historySource.includes('data-tab="followup"'), false);
+});
+
+test('runtime entry points use core-first module names', () => {
+  for (const file of ['runtime-defaults.js','preferences-store.js','schedule-preferences.js','history-source.js']) {
+    assert.match(html, new RegExp(file.replace('.', '\\.')));
+  }
+  for (const legacy of ['default-policy.js','policy-profile.js','policy-bridge.js','workflow-unifier.js']) {
+    assert.equal(html.includes(legacy), false, legacy);
+  }
+});
+
+test('architecture explicitly protects primary task flow from supporting modules', () => {
+  assert.match(architecture, /The only primary business object is a task/);
+  assert.match(architecture, /Historical mail is a supplementary source/);
+  assert.match(architecture, /Internal constraints — never product navigation/);
 });
 
 test('contact interaction state is mailbox-derived', () => {
@@ -53,7 +71,7 @@ test('contact interaction state is mailbox-derived', () => {
   assert.match(contacts, /contact\.stage = interactionState\(contact\)/);
 });
 
-test('contact evidence is contextual and only exposes policy control', () => {
+test('contact evidence is contextual and only exposes recipient safeguards', () => {
   assert.match(html, /contact-evidence\.js/);
   const evidence = fs.readFileSync('contact-evidence.js', 'utf8');
   assert.match(evidence, /\.nmda-recipient-cell/);
