@@ -8,8 +8,8 @@ const vm = require('node:vm');
 
 const ROOT = path.resolve(__dirname, '..');
 
-function runtime() {
-  const values = new Map();
+function runtime(seed = {}) {
+  const values = new Map(Object.entries(seed));
   const context = {
     console,
     localStorage: {
@@ -20,50 +20,67 @@ function runtime() {
   };
   context.globalThis = context;
   vm.createContext(context);
-  for (const file of ['policy-profile.js', 'scheduler.js', 'roster-v2.js']) {
+  for (const file of ['default-policy.js', 'policy-profile.js', 'scheduler.js', 'roster-v2.js']) {
     vm.runInContext(fs.readFileSync(path.join(ROOT, file), 'utf8'), context, { filename:file });
   }
   return context;
 }
 
-test('unconfigured scheduling stays unconfigured', () => {
-  const { NMDAScheduler: Scheduler } = runtime();
-  assert.equal(Scheduler.defaultStart(), '');
+test('core scheduler stays policy-neutral while product profile supplies automation defaults', () => {
+  const { NMDAScheduler: Scheduler, NMDAPolicyProfile: Policy } = runtime();
   assert.equal(Scheduler.DEFAULT_RULES.startAt, '');
   assert.equal(Scheduler.DEFAULT_RULES.grouping, 'none');
   assert.equal(Scheduler.DEFAULT_RULES.maxPerGroupPerRound, null);
   assert.equal(Scheduler.DEFAULT_RULES.intervalDays, null);
   assert.equal(Scheduler.DEFAULT_RULES.skipHolidays, false);
 
-  const inheritedUiValues = Scheduler.normalizeRules({
-    startAt:'2032-03-04T09:00',
-    maxPerGroupPerRound:1,
-    intervalDays:7,
-    skipHolidays:true
-  });
-  assert.equal(inheritedUiValues.startAt, '');
-  assert.equal(inheritedUiValues.maxPerGroupPerRound, null);
-  assert.equal(inheritedUiValues.intervalDays, null);
-  assert.equal(inheritedUiValues.skipHolidays, false);
+  const effective = Policy.getEffectivePolicy().schedule;
+  assert.equal(effective.grouping, 'institution');
+  assert.equal(effective.maxPerGroupPerRound, 1);
+  assert.equal(effective.intervalDays, 7);
+  assert.equal(effective.skipHolidays, true);
+
+  const resolved = Scheduler.normalizeRules({});
+  assert.equal(resolved.grouping, 'institution');
+  assert.equal(resolved.maxPerGroupPerRound, 1);
+  assert.equal(resolved.intervalDays, 7);
+  assert.equal(resolved.skipHolidays, true);
+  assert.ok(resolved.startAt);
 });
 
-test('explicit scheduling policy is honored without adding extra rules', () => {
+test('legacy values equal to product defaults are not promoted to user overrides', () => {
+  const legacy = JSON.stringify({maxPerGroupPerRound:1,intervalDays:7,preserveExisting:true,intraRoundMinutes:10,skipHolidays:true});
+  const { NMDAPolicyProfile: Policy } = runtime({'nmda.schedule.rules.v1': legacy});
+  assert.deepEqual(Policy.getProfile().schedule.explicitFields, []);
+});
+
+test('legacy values that differ from defaults become user overrides', () => {
+  const legacy = JSON.stringify({maxPerGroupPerRound:2,intervalDays:14,preserveExisting:true,intraRoundMinutes:10,skipHolidays:false});
+  const { NMDAPolicyProfile: Policy } = runtime({'nmda.schedule.rules.v1': legacy});
+  const effective = Policy.getEffectivePolicy().schedule;
+  assert.equal(effective.maxPerGroupPerRound, 2);
+  assert.equal(effective.intervalDays, 14);
+  assert.equal(effective.skipHolidays, false);
+});
+
+test('explicit scheduling input is honored without adding hidden rules', () => {
   const { NMDAScheduler: Scheduler } = runtime();
   const rules = Scheduler.normalizeRules({
     policySource:'explicit',
     startAt:'2032-03-04T09:00',
-    grouping:'institution',
-    maxPerGroupPerRound:2,
-    intervalDays:5,
-    skipHolidays:true
+    grouping:'none',
+    maxPerGroupPerRound:null,
+    intervalDays:null,
+    preserveExisting:false,
+    intraRoundMinutes:0,
+    skipHolidays:false,
+    allowDomainFallback:false
   });
   assert.equal(rules.startAt, '2032-03-04T09:00');
-  assert.equal(rules.grouping, 'institution');
-  assert.equal(rules.maxPerGroupPerRound, 2);
-  assert.equal(rules.intervalDays, 5);
-  assert.equal(rules.skipHolidays, true);
-  assert.equal(rules.intraRoundMinutes, 0);
-  assert.equal(rules.allowDomainFallback, false);
+  assert.equal(rules.grouping, 'none');
+  assert.equal(rules.maxPerGroupPerRound, null);
+  assert.equal(rules.intervalDays, null);
+  assert.equal(rules.skipHolidays, false);
 });
 
 test('invalid local dates are rejected instead of rolling forward', () => {
@@ -72,15 +89,19 @@ test('invalid local dates are rejected instead of rolling forward', () => {
   assert.ok(Scheduler.parseLocalDateTime('2032-02-29T09:00'));
 });
 
-test('institution similarity does not create identity', () => {
+test('default policy ships no institution-specific aliases', () => {
+  const { NMDAPolicyProfile: Policy } = runtime();
+  assert.deepEqual(Policy.getDefaultPolicy().identity.aliases, []);
+});
+
+test('institution similarity does not create identity by itself', () => {
   const { NMDARoster: Roster } = runtime();
   assert.equal(Roster.sameSchool('Example University', 'Example University London'), false);
   assert.equal(Roster.sameSchool('Example University', 'Example University'), true);
 });
 
-test('only an explicit alias may unify different institution labels', () => {
+test('learned alias may unify labels without changing core code', () => {
   const { NMDAPolicyProfile: Policy, NMDARoster: Roster } = runtime();
-  assert.equal(Roster.sameSchool('Example University', 'Example University London'), false);
   Policy.setInstitutionAlias('Example University', ['Example University London']);
   assert.equal(Roster.sameSchool('Example University', 'Example University London'), true);
 });
