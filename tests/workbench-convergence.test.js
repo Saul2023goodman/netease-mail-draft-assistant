@@ -17,7 +17,7 @@ test('standalone workbench is the only front-end surface', () => {
   assert.match(app, /2 · 核验/);
   assert.match(app, /3 · 排期/);
   assert.match(app, /4 · 执行/);
-  for (const token of ['nmda-launcher','setPanelOpen','data-view-step','uiStep','autoAdvancing','enterSelectionAndSchedule','supplementPreflight']) {
+  for (const token of ['nmda-launcher','nmda-brand-mark','setPanelOpen','data-view-step','uiStep','autoAdvancing','enterSelectionAndSchedule','supplementPreflight']) {
     assert.equal(app.includes(token), false, token);
   }
   assert.equal(css.includes('nmda-launcher'), false);
