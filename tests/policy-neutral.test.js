@@ -51,7 +51,7 @@ test('core scheduler stays policy-neutral while product profile supplies automat
 test('legacy values equal to product defaults are not promoted to user overrides', () => {
   const legacy = JSON.stringify({maxPerGroupPerRound:1,intervalDays:7,preserveExisting:true,intraRoundMinutes:10,skipHolidays:true});
   const { NMDAPolicyProfile: Policy } = runtime({'nmda.schedule.rules.v1': legacy});
-  assert.deepEqual(Policy.getProfile().schedule.explicitFields, []);
+  assert.equal(Array.from(Policy.getProfile().schedule.explicitFields).length, 0);
 });
 
 test('legacy values that differ from defaults become user overrides', () => {
@@ -91,7 +91,7 @@ test('invalid local dates are rejected instead of rolling forward', () => {
 
 test('default policy ships no institution-specific aliases', () => {
   const { NMDAPolicyProfile: Policy } = runtime();
-  assert.deepEqual(Policy.getDefaultPolicy().identity.aliases, []);
+  assert.equal(Array.from(Policy.getDefaultPolicy().identity.aliases).length, 0);
 });
 
 test('institution similarity does not create identity by itself', () => {
